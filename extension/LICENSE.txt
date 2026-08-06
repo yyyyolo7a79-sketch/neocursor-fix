@@ -1,0 +1,9 @@
+GNU GENERAL PUBLIC LICENSE Version 3
+
+本扩展以 GPL-3.0 许可发布。
+
+动画脚本 neovide-cursor.js 源自 vision-smash-code
+(https://github.com/Jenlybein/vision-smash-code, GPL-3.0)，
+原始项目 Neovide-Cursor (https://github.com/30d98f9b2/Neovide-Cursor)。
+
+完整许可证文本见 https://www.gnu.org/licenses/gpl-3.0.txt
