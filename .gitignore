@@ -1,0 +1,9 @@
+# 敏感文件：包含个人信息，不入库
+需求.md
+
+# 打包产物：vsix 通过 GitHub Release 发布
+*.vsix
+
+# Node
+node_modules/
+dist/

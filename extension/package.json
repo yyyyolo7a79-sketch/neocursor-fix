@@ -1,0 +1,38 @@
+{
+	"name": "neovide-cursor-injector",
+	"displayName": "Neovide Cursor Injector",
+	"description": "Neovide 风格光标动画自动注入器：无需 Custom CSS Loader，安装即自动注入，VS Code 更新后自动重新注入",
+	"version": "1.0.0",
+	"publisher": "yyyyolo7a79",
+	"engines": {
+		"vscode": "^1.80.0"
+	},
+	"categories": [
+		"Other"
+	],
+	"keywords": [
+		"cursor",
+		"animation",
+		"neovide",
+		"injector",
+		"visual"
+	],
+	"activationEvents": [
+		"onStartupFinished"
+	],
+	"main": "./extension.js",
+	"contributes": {
+		"commands": [
+			{
+				"command": "neovideCursorInject.reinject",
+				"title": "Neovide Cursor: 重新注入光标动画",
+				"category": "Neovide Cursor"
+			}
+		]
+	},
+	"license": "GPL-3.0-only",
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/yyyyolo7a79-sketch/neocursor-fix"
+	}
+}
