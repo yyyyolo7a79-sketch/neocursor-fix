@@ -2,7 +2,7 @@
 	"name": "neovide-cursor-injector",
 	"displayName": "Neovide Cursor Injector",
 	"description": "Neovide 风格光标动画自动注入器：无需 Custom CSS Loader，安装即自动注入，VS Code 更新后自动重新注入",
-	"version": "1.0.0",
+	"version": "1.1.0",
 	"publisher": "yyyyolo7a79",
 	"engines": {
 		"vscode": "^1.80.0"

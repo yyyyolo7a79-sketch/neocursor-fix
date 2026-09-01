@@ -1,4 +1,4 @@
-// Neovide Cursor Injector —— 自动注入扩展
+// Neovide Cursor Injector —— 自动注入扩展（v1.1.0）
 //
 // 原理：新版 VS Code 的 CSP 禁用了内联脚本（script-src 无 'unsafe-inline'），
 // 导致 Custom CSS and JS Loader 的内联 <script> 注入被拦截、光标动画失效。
@@ -9,7 +9,12 @@
 // 行为：
 //  1. 启动时自动检测注入状态：未注入 → 自动注入 + 提示重启；已注入 → 静默跳过
 //  2. VS Code 更新后（out 目录被覆盖）再次启动时自动重新注入
-//  3. 提供命令 "Neovide Cursor: 重新注入光标动画" 手动触发
+//  3. 延时复核（v1.1.0 新增）：激活后 10s/40s 复查注入状态 —— VS Code 更新
+//     是在扩展激活之后才原子替换 out 目录的（InnoSetup 更新器的实测行为），
+//     首轮注入可能赶上"文件即将被别人覆盖"的竞态，复核兜底保证最终状态正确
+//  4. 完整行为日志（v1.1.0 新增）：每次检测/注入/复核都写入扩展安装目录下的
+//     injector.log，更新后失效时可据此定位问题
+//  5. 提供命令 "Neovide Cursor: 重新注入光标动画" 手动触发
 
 const vscode = require("vscode");
 const fs = require("fs");
@@ -21,6 +26,35 @@ const JS_FILENAME = "neovide-cursor.js";
 const REL_WORKBENCH = path.join(
 	"out", "vs", "code", "electron-browser", "workbench", "workbench.html",
 );
+// 复核时间点（ms）：覆盖"更新器在扩展激活后才替换文件"的竞态窗口
+const RECHECK_DELAYS = [10_000, 40_000];
+
+// ============ 日志 ============
+let logFile = null;
+
+function initLog(ctx) {
+	try {
+		const dir = path.join(ctx.extensionPath, ".."); // 扩展安装区父目录（与扩展同级，可写）
+		logFile = path.join(dir, "injector.log");
+		writeLog("=== 扩展激活 ===");
+	} catch (e) {
+		logFile = null;
+	}
+}
+
+function writeLog(msg) {
+	if (!logFile) return;
+	try {
+		const ts = new Date().toISOString().slice(0, 19);
+		fs.appendFileSync(
+			logFile,
+			`[${ts}] ${msg}\n`,
+			"utf-8",
+		);
+	} catch (e) {
+		// 日志写失败不影响主流程
+	}
+}
 
 /**
  * 定位 workbench.html。
@@ -110,11 +144,24 @@ function inject(context) {
 }
 
 /**
+ * 单次检测 + 处置，返回结果供报告/日志
+ */
+function runOnce(context, isRecheck) {
+	const r = inject(context);
+	writeLog(
+		`${isRecheck ? "[复核]" : "[首轮]"} inject(${r.status})` +
+			(r.msg ? `: ${r.msg}` : "") +
+			` html=${findWorkbenchHtml() || "未找到"}`,
+	);
+	return r;
+}
+
+/**
  * 激活入口
  */
 function activate(context) {
-	// 自动注入
-	const result = inject(context);
+	initLog(context);
+	const result = runOnce(context, false);
 	if (result.status === "injected") {
 		vscode.window.showInformationMessage(
 			"✨ Neovide Cursor 已注入！请完全重启 VS Code 查看效果（若提示'已损坏'，点'不再提示'即可）",
@@ -129,11 +176,28 @@ function activate(context) {
 	}
 	// 'already' 状态静默跳过
 
+	// 延时复核：VS Code 更新在扩展激活后才替换 out 目录时，
+	// 首轮注入可能被覆盖，此处兜底重注入（v1.1.0）
+	for (const delay of RECHECK_DELAYS) {
+		setTimeout(() => {
+			try {
+				const r = runOnce(context, true);
+				if (r.status === "injected") {
+					vscode.window.showInformationMessage(
+						"🔁 Neovide Cursor 自动复核：检测到更新覆盖，已重新注入！请重启 VS Code 生效",
+					);
+				}
+			} catch (e) {
+				writeLog(`复核异常: ${e.message}`);
+			}
+		}, delay);
+	}
+
 	// 手动重新注入命令
 	const cmd = vscode.commands.registerCommand(
 		"neovideCursorInject.reinject",
 		async () => {
-			const r = inject(context);
+			const r = runOnce(context, false);
 			if (r.status === "injected") {
 				await vscode.window.showInformationMessage(
 					"✨ 注入完成！请完全重启 VS Code 生效",
