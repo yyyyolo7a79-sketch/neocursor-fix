@@ -1,13 +1,15 @@
 # ✨ Neovide Cursor Injector
 
 Neovide 风格光标动画自动注入器 —— 无需 Custom CSS Loader，安装即用。
+支持 **VS Code** 与 **Cursor**（自动识别，无需额外配置）。
 
 ![效果预览](https://raw.githubusercontent.com/30d98f9b2/Neovide-Cursor/refs/heads/main/gifs/basicAnimation.gif)
 
 ## 🚀 使用方法
 
 1. 安装扩展：`Extensions: Install from VSIX...` 选择 `.vsix` 文件
-2. **完全重启 VS Code**（不是 Reload Window）
+   （Cursor 也可用命令行：`cursor --install-extension xxx.vsix`）
+2. **完全重启**（不是 Reload Window）
 3. 完成！打字时即可看到弹性光标动画
 
 ## ⚙️ 自定义配置
@@ -18,27 +20,30 @@ Neovide 风格光标动画自动注入器 —— 无需 Custom CSS Loader，安�
    - `useShadow`：辉光开关
    - `animationLength`：动画速度
    - `cursorDisappearDelay`：光标消失延迟
-3. 保存后重新执行注入命令，重启 VS Code 生效
+3. 保存后重新执行注入命令，重启生效
 
 ## ❓ 常见问题
 
-### Q: 重启后 VS Code 提示"已损坏"？
-A: 正常现象。本扩展会修改 VS Code 内部文件（workbench.html）来注入动画，
-这是此类插件的通用做法。点击"不再提示"即可，不影响任何功能。
+### Q: 编辑器更新后动画没了？
+A: 不用管，扩展会在下次启动时自动重新注入（含更新器覆盖的竞态兜底）。
 
-### Q: VS Code 更新后动画没了？
-A: 不用管，扩展会在下次启动时自动重新注入。
+### Q: 提示"安装已损坏"？
+A: v1.2.0 起不再出现——注入后会自动同步产品的校验值。
+旧版扩展留下的该提示点"不再提示"即可，不影响任何功能。
 
 ### Q: 安装了但没效果？
 A: 请检查：
-1. 是否**完全退出**了 VS Code 再重新打开（注入需重启生效）
-2. 若 VS Code 装在 Program Files 等受保护目录，请以**管理员身份**运行 VS Code 一次
-3. 扩展是否会弹出错误提示（若有，把提示内容告诉我）
+1. 是否**完全退出**后再重新打开（注入需重启生效）
+2. 若装在 `Program Files` 等受保护目录，请以**管理员身份**运行一次
+3. 查看 `injector.log`（扩展安装目录的父目录下），里面有每轮检测/注入记录
 
 ### Q: 如何卸载？
-A: 卸载扩展前，先把 `workbench.html` 还原（删除注入的两行 + 删除
-`neovide-cursor.js`），再卸载扩展。文件位于：
-`<VS Code 安装目录>/resources/app/out/vs/code/electron-browser/workbench/`
+A: 先还原 `workbench.html`（删除注入的两行 + 删除 `neovide-cursor.js`），再卸载扩展。
+文件位于安装目录下（两者其一）：
+- Cursor / 新版 VS Code：`resources/app/out/vs/code/electron-sandbox/workbench/`
+- 旧版 VS Code：`resources/app/out/vs/code/electron-browser/workbench/`
+
+同目录下留有注入前的 `workbench.html.bak-*` 时间戳备份，可直接改回。
 
 ## 📃 许可证
 

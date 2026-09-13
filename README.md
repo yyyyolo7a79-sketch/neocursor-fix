@@ -4,9 +4,9 @@
 
 [![License: GPL-3.0](https://img.shields.io/badge/License-GPL--3.0-blue.svg)](LICENSE)
 
-Neovide 风格的光标弹性动画，无需 Custom CSS Loader，安装 VSIX 即用，VS Code 更新后自动重新注入。
+Neovide 风格的光标弹性动画，无需 Custom CSS Loader，安装 VSIX 即用，**支持 VS Code 与 Cursor**，编辑器更新后自动重新注入。
 
-A Neovide-style cursor animation for VS Code. No Custom CSS Loader needed — install the VSIX and you're done. Auto-reinjects after VS Code updates.
+A Neovide-style cursor animation for **VS Code and Cursor**. No Custom CSS Loader needed — install the VSIX and you're done. Auto-reinjects after editor updates.
 
 ---
 
@@ -25,20 +25,26 @@ The original extension ([vscode-neovide-cursor](https://github.com/LengineerC/vs
 | 需要 Custom CSS Loader | ✅ | ❌ 不需要 / Not needed |
 | 兼容新版 VS Code CSP | ❌ 失效 / Broken | ✅ |
 | 安装方式 / Install | 手动配置 `vscode_custom_css.imports` | 安装 VSIX 即用 / Install & use |
-| VS Code 更新后 / After update | 需手动重新注入 / Manual | ✅ 自动重新注入 / Auto reinject |
+| 更新后自动重注入 / After update | 需手动重新注入 / Manual | ✅ 自动重新注入 / Auto reinject |
+| Cursor 支持 / Cursor support | ❌ | ✅ |
+| "安装已损坏"提示 / "Corrupted" banner | 会出现 / Shown | ❌ v1.2.0 起自动同步校验值 / Auto-synced since v1.2.0 |
 
 ---
 
 ## 🚀 快速开始 / Quick Start
 
-1. 从 [Releases](https://github.com/yyyyolo7a79-sketch/neocursor-fix/releases) 下载 `neovide-cursor-injector-1.0.0.vsix`
-2. VS Code 中执行命令 `Extensions: Install from VSIX...` 选择该文件
-3. **完全重启 VS Code**（不是 Reload Window）
+1. 从 [Releases](https://github.com/yyyyolo7a79-sketch/neocursor-fix/releases) 下载最新 `neovide-cursor-injector-1.2.0.vsix`
+2. 安装扩展：
+   - VS Code / Cursor：命令面板执行 `Extensions: Install from VSIX...` 选择该文件
+   - 或命令行：`cursor --install-extension neovide-cursor-injector-1.2.0.vsix`
+3. **完全重启编辑器**（不是 Reload Window）
 4. 完成！打字时即可看到弹性光标动画
 
-1. Download `neovide-cursor-injector-1.0.0.vsix` from [Releases](https://github.com/yyyyolo7a79-sketch/neocursor-fix/releases).
-2. Run `Extensions: Install from VSIX...` in VS Code and pick the file.
-3. **Fully restart VS Code** (not Reload Window).
+1. Download the latest `neovide-cursor-injector-1.2.0.vsix` from [Releases](https://github.com/yyyyolo7a79-sketch/neocursor-fix/releases).
+2. Install it:
+   - VS Code / Cursor: run `Extensions: Install from VSIX...` and pick the file
+   - Or via CLI: `cursor --install-extension neovide-cursor-injector-1.2.0.vsix`
+3. **Fully restart the editor** (not Reload Window).
 4. Done! You'll see the elastic cursor animation while typing.
 
 ---
@@ -51,7 +57,7 @@ The original extension ([vscode-neovide-cursor](https://github.com/LengineerC/vs
    - `useShadow`：辉光开关 / glow toggle
    - `animationLength`：动画速度 / animation speed
    - `cursorDisappearDelay`：光标消失延迟 / cursor disappear delay
-3. 保存后重新执行注入命令，重启 VS Code 生效 / Save, re-run the reinject command, then restart VS Code.
+3. 保存后重新执行注入命令，重启生效 / Save, re-run the reinject command, then restart.
 
 覆盖主题光标颜色（可选）/ Override theme cursor color (optional):
 
@@ -65,28 +71,54 @@ The original extension ([vscode-neovide-cursor](https://github.com/LengineerC/vs
 
 ## ❓ 常见问题 / FAQ
 
-### Q: 重启后 VS Code 提示"已损坏"？/ VS Code says "corrupted" after restart?
-A: 正常现象。本扩展会修改 VS Code 内部文件（`workbench.html`）来注入动画，这是此类插件的通用做法。点击"不再提示"即可，不影响任何功能。
-A: Expected. This extension modifies VS Code internals (`workbench.html`) to inject the animation — the standard approach for this kind of plugin. Click "Don't show again". It doesn't affect any functionality.
+### Q: 提示"安装已损坏"？/ "Installation appears to be corrupted"?
+A: v1.2.0 起不再出现——注入后会自动同步产品校验值（`product.json` 的 `checksums`）。旧版扩展留下的提示点"不再提示"即可，不影响任何功能。
+A: Since v1.2.0 this no longer appears — the extension syncs the product checksum (`product.json` → `checksums`) after injecting. If an older version left the banner, click "Don't show again". It doesn't affect any functionality.
 
-### Q: VS Code 更新后动画没了？/ Animation missing after VS Code update?
-A: 不用管，扩展会在下次启动时自动重新注入。
-A: Don't worry — the extension automatically reinjects on next startup.
+### Q: 编辑器更新后动画没了？/ Animation missing after an update?
+A: 不用管，扩展会在下次启动时自动重新注入（含更新器覆盖竞态的延时复核兜底）。
+A: Don't worry — the extension reinjects automatically on next startup (with delayed re-checks to cover update-overwrite races).
 
 ### Q: 安装了但没效果？/ Installed but no effect?
 A: 请检查 / Please check:
-1. 是否**完全退出**了 VS Code 再重新打开（注入需重启生效）/ Did you **fully quit** VS Code and reopen it? (injection needs a restart)
-2. 若 VS Code 装在 `Program Files` 等受保护目录，请以**管理员身份**运行 VS Code 一次 / If VS Code is in a protected directory like `Program Files`, run VS Code as **administrator** once.
-3. 扩展是否会弹出错误提示（若有，把提示内容告诉我）/ Does the extension show an error notification? (if so, tell us the message)
+1. 是否**完全退出**了编辑器再重新打开（注入需重启生效）/ Did you **fully quit** the editor and reopen it? (injection needs a restart)
+2. 若装在 `Program Files` 等受保护目录，请以**管理员身份**运行一次 / If installed in a protected directory like `Program Files`, run the editor as **administrator** once.
+3. 查看 `injector.log`（扩展安装目录的父目录下），里面有每轮检测/注入记录 / Check `injector.log` (in the parent directory of the extension install folder) for per-run detect/inject records.
 
 ### Q: 如何卸载？/ How to uninstall?
-A: 卸载扩展前，先把 `workbench.html` 还原（删除注入的两行 + 删除 `neovide-cursor.js`），再卸载扩展。文件位于：
-`<VS Code 安装目录>/resources/app/out/vs/code/electron-browser/workbench/`
-A: Before uninstalling, restore `workbench.html` (remove the two injected lines + delete `neovide-cursor.js`), then uninstall. Files live in:
-`<VS Code install dir>/resources/app/out/vs/code/electron-browser/workbench/`
+A: 卸载扩展前，先把 `workbench.html` 还原（删除注入的两行 + 删除 `neovide-cursor.js`），再卸载扩展。文件位于（两者其一；同目录下有注入前的 `workbench.html.bak-*` 时间戳备份可直接改回）：
+- Cursor / 新版 VS Code：`<安装目录>/resources/app/out/vs/code/electron-sandbox/workbench/`
+- 旧版 VS Code：`<安装目录>/resources/app/out/vs/code/electron-browser/workbench/`
+
+A: Before uninstalling, restore `workbench.html` (remove the two injected lines + delete `neovide-cursor.js`), then uninstall. Files live in one of (a pre-injection `workbench.html.bak-*` backup is available in the same directory):
+- Cursor / newer VS Code: `<install dir>/resources/app/out/vs/code/electron-sandbox/workbench/`
+- Older VS Code: `<install dir>/resources/app/out/vs/code/electron-browser/workbench/`
 
 > ⚠️ 性能提示：动画会带来一定性能负担与电量消耗，建议插电使用。
 > ⚠️ Performance: the animation costs some performance and battery. Plug in your laptop.
+
+---
+
+## 📝 更新日志 / Changelog
+
+### v1.2.0
+- ✅ 新增 **Cursor 支持**（自动探测 `electron-sandbox` 目录结构）
+- ✅ 注入后自动同步 `product.json` 校验值，不再出现"安装已损坏"提示（VS Code 同样受益）
+- ✅ 提示语按产品名动态显示（Cursor 里不再显示 "VS Code"）
+- 🔧 核心逻辑抽离为 `injector-core.js`，新增本地验证脚本
+
+### v1.2.0 (English)
+- ✅ **Cursor support** (auto-detects the `electron-sandbox` layout)
+- ✅ Syncs the `product.json` checksum after injecting — no more "corrupted installation" banner (also benefits VS Code)
+- ✅ Dynamic product name in notifications (no more "VS Code" shown inside Cursor)
+- 🔧 Core logic extracted to `injector-core.js`, with a local verification script
+
+### v1.1.0
+- ✅ 延时复核（10s/40s），解决更新覆盖注入的竞态问题 / Delayed re-checks (10s/40s) to survive update-overwrite races
+- ✅ 完整行为日志 `injector.log` / Full activity log
+
+### v1.0.0
+- 🎉 首个版本：CSP 兼容的外部脚本注入方案 / Initial release: CSP-compatible external-script injection
 
 ---
 
@@ -94,6 +126,12 @@ A: Before uninstalling, restore `workbench.html` (remove the two injected lines 
 
 ```bash
 npx @vscode/vsce package
+```
+
+本地验证（在临时目录构造迷你安装结构，零副作用）/ Local verification (builds a mini install layout in a temp dir, zero side effects):
+
+```bash
+node extension/test/manual-inject-test.js
 ```
 
 ---

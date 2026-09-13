@@ -1,0 +1,6 @@
+# 打包 vsix 时排除的文件
+test/**
+*.vsix
+*.bak
+*.bak-*
+injector.log
