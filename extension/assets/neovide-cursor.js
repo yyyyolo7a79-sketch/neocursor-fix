@@ -146,28 +146,35 @@ class Corner {
       y: (dest.y - this.pd.y) / dim.height,
     };
 
-    const len = Math.hypot(jv.x, jv.y);
-    const jvNorm = len ? { x: jv.x / len, y: jv.y / len } : { x: 0, y: 0 };
-
-    const isShortMove =
-      Math.hypot(jv.x, jv.y) <= cursorConfig.shortMoveThreshold;
-
-    const baseTime = isShortMove
-      ? cursorConfig.shortAnimationLength
-      : cursorConfig.animationLength;
+    const dist = Math.hypot(jv.x, jv.y); // 本次移动距离（相对光标尺寸的倍数）
+    const jvNorm = dist ? { x: jv.x / dist, y: jv.y / dist } : { x: 0, y: 0 };
 
     const alignment = jvNorm.x * this.rpNorm.x + jvNorm.y * this.rpNorm.y;
 
     const useSnap =
       cursorConfig.useHardSnap && alignment > cursorConfig.leadingSnapThreshold;
 
-    const factor = useSnap
-      ? cursorConfig.leadingSnapFactor
-      : (this.TRAIL_FACTORS[rank] ?? 1);
-
-    const lenAnim = useSnap
-      ? cursorConfig.snapAnimationLength
-      : baseTime * cursorClamp(factor, 0, 1);
+    let lenAnim;
+    if (useSnap) {
+      lenAnim = cursorConfig.snapAnimationLength;
+    } else if (dist <= cursorConfig.shortMoveThreshold) {
+      // 短距离（打字、小范围移动）：保持原有的丝滑拖尾
+      lenAnim =
+        cursorConfig.shortAnimationLength *
+        cursorClamp(this.TRAIL_FACTORS[rank] ?? 1, 0, 1);
+    } else {
+      // 远距离：速度自适应（v1.2.4）。
+      // 滞后距离 ≈ 移动速度 × 弹簧时间常数；时间常数固定时，移动越快拖尾被
+      // 甩得越远（"一直在追"）。此处按移动距离反比收缩时长，距离越远越贴近，
+      // 下限为吸附时长，保证快速移动时拖尾主动收敛而非失控拉长。
+      const shrink = cursorConfig.shortMoveThreshold / dist;
+      lenAnim = Math.max(
+        cursorConfig.snapAnimationLength,
+        cursorConfig.animationLength *
+          cursorClamp(this.TRAIL_FACTORS[rank] ?? 1, 0, 1) *
+          shrink,
+      );
+    }
 
     this.ax.animationLength = lenAnim;
     this.ay.animationLength = lenAnim;
@@ -349,6 +356,36 @@ const MAX_CURSORS = 40; // 光标实例数量上限（自我保护，防异常�
 const SYNC_INTERVAL = 400; // 全量扫描间隔（ms）
 const START_DELAY = 1500; // 页面 load 后的启动延迟（ms）
 
+/**
+ * 读取光标元素的位置（视口坐标）。
+ *
+ * v1.2.4：优先用内联 style.left/top（Monaco 写入的"目标"位置）+ 定位祖先的
+ * 视口位置换算，而不是直接 getBoundingClientRect()。原因：当用户开启
+ * editor.cursorSmoothCaretAnimation 时，.cursor 上有 `transition: all 80ms`，
+ * 此时 getBoundingClientRect() 返回的是过渡动画的"插值中间值"，用它驱动拖尾
+ * 会让拖尾额外滞后最多 80ms。style.left/top 是目标值，不受过渡影响。
+ * 任一环节异常时回退到 getBoundingClientRect()。
+ */
+function readCursorRect(el) {
+  const r = el.getBoundingClientRect();
+  try {
+    const sl = parseFloat(el.style.left);
+    const st = parseFloat(el.style.top);
+    if (isNaN(sl) || isNaN(st)) return r;
+    const anchor = el.offsetParent; // absolute 元素的最近定位祖先（.cursors-layer）
+    if (!anchor) return r;
+    const a = anchor.getBoundingClientRect();
+    // style.left/top 相对包含块（祖先的 padding box），需补上祖先的 border 宽度
+    const left = a.left + anchor.clientLeft + sl;
+    const top = a.top + anchor.clientTop + st;
+    const width = el.offsetWidth || r.width;
+    const height = el.offsetHeight || r.height;
+    return { left, top, width, height, right: left + width, bottom: top + height };
+  } catch (e) {
+    return r;
+  }
+}
+
 // GlobalCursorManager 类: 系统的控制塔：负责扫描 DOM 节点、同步多光标实例、控制原生光标的显隐以及渲染 Canvas
 class GlobalCursorManager {
   constructor() {
@@ -471,7 +508,7 @@ class GlobalCursorManager {
         // 自我保护：实例数量异常增长时停止新建（宿主 DOM 异常场景下避免拖垮渲染进程）
         if (this.cursors.size >= MAX_CURSORS) return;
 
-        const r = el.getBoundingClientRect();
+        const r = readCursorRect(el);
         if (r.left <= 0 && r.top <= 0) return;
 
         const inst = createNeovideCursor({ canvas: this.canvas });
@@ -509,7 +546,7 @@ class GlobalCursorManager {
         continue;
       }
 
-      const r = el.getBoundingClientRect();
+      const r = readCursorRect(el);
       const hasMoved = r.left !== data.lastX || r.top !== data.lastY;
       let isNowActive = data.isActive;
       if (!data.isActive || hasMoved) {
@@ -616,7 +653,7 @@ class GlobalCursorManager {
       for (const [el, data] of this.cursors) {
         if (!data.isActive) continue;
 
-        const r = data.rect || el.getBoundingClientRect();
+        const r = data.rect || readCursorRect(el);
         const anim = data.instance.updateLoop(
           this.isScrolling,
           r.left >= 0 && r.top >= 0 && r.left <= this.winW,

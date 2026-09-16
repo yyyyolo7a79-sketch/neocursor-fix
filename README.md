@@ -110,6 +110,29 @@ A: Before uninstalling, restore `workbench.html` (remove the two injected lines 
 
 ## 📝 更新日志 / Changelog
 
+### v1.2.4
+- 🐛 修复**快速移动 / 拖动乱晃时拖尾"追不上"光标**的问题：拖尾滞后 = 移动速度 × 弹簧
+  时间常数，速度越快甩得越远（实测极端乱晃下滞后可达 350~600px，拖尾变成被甩开的色块）。
+  新增**速度自适应**：弹簧时长随移动距离反比收缩（下限为吸附时长）——快速移动时拖尾
+  主动收敛、紧贴光标；打字与慢速移动保持原有的丝滑拖尾不变。
+  实测（12px/帧随机换向的乱晃模拟）：滞后从 ~350px 降至 **0px**。
+- 🔧 位置读取优化：改用 `style.left/top` + 定位祖先换算（不再依赖 `getBoundingClientRect`），
+  不受光标 CSS 过渡插值影响。
+
+<details>
+<summary>v1.2.4 (English)</summary>
+
+- 🐛 Fixed the trail "can't keep up" during fast movement / mouse swinging: trail lag
+  equals speed × spring time-constant, so faster movement throws the trail further
+  behind (350–600px in extreme swings). Added **speed adaptation**: the spring duration
+  now shrinks inversely with movement distance (floored at the snap duration) — the
+  trail converges onto the cursor during fast movement, while typing/slow movement
+  keeps the original silky trail. Measured with a 12px/frame random-direction swing:
+  lag dropped from ~350px to **0px**.
+- 🔧 Position reading now uses `style.left/top` + positioned-ancestor math instead of
+  `getBoundingClientRect()`, immune to CSS-transition interpolation.
+</details>
+
 ### v1.2.3
 - 🐛 修复快速移动/拖动时的"跟随延迟感"：v1.2.1 修复 `target` 字段后首次真正启用了
   「隐藏原生光标」逻辑，使跟随完全依赖物理引擎（弹簧动画固有约 0.1s 滞后，实测快速
