@@ -5,6 +5,9 @@
 prompt.md
 .playwright-mcp/
 
+# 测试台运行时生成（run-sim.js 每次自动复制最新脚本）
+extension/test/perf-sim/neovide-cursor.js
+
 # 打包产物：vsix 通过 GitHub Release 发布
 *.vsix
 

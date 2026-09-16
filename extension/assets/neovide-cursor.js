@@ -19,7 +19,15 @@ const cursorConfig = {
   leadingSnapThreshold: 0.5,
   animationResetThreshold: 0.09,
   maxTrailDistanceFactor: 60,
-  snapAnimationLength: 0.02,
+  // 前缘（移动方向上的角点）吸附时长。
+  // v1.2.5：0.02 → 0（瞬时贴合）。弹簧更新里有 "animationLength <= dt
+  // → 直接归位" 的短路：0 对任意帧率恒成立，前缘角每次移动后立即到位
+  // （除零慢路径被短路保护，不会执行）。
+  // 这是"看起来只有一个光标"的关键——此前 0.02 时每次光标跳变后弹簧一帧
+  // 只衰减约三成（实测跳变后残留滞后 ≈5px），而真实光标仅约 2px 宽，前缘会
+  // 脱离光标本体，观感上就是"两个光标"。尾巴形态与弹性由其余角点的滞后产生，
+  // 不受此项影响。
+  snapAnimationLength: 0,
   canvasFadeTransitionCss: "opacity 0.075s ease-out",
   nativeCursorDisappearTransitionCss: "opacity 0s ease-out",
   nativeCursorRevealTransitionCss: "opacity 0.075s ease-in",

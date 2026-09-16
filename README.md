@@ -33,17 +33,17 @@ The original extension ([vscode-neovide-cursor](https://github.com/LengineerC/vs
 
 ## 🚀 快速开始 / Quick Start
 
-1. 从 [Releases](https://github.com/yyyyolo7a79-sketch/neocursor-fix/releases) 下载最新 `neovide-cursor-injector-1.2.0.vsix`
+1. 从 [Releases](https://github.com/yyyyolo7a79-sketch/neocursor-fix/releases) 下载最新 `neovide-cursor-injector-1.2.5.vsix`
 2. 安装扩展：
    - VS Code / Cursor：命令面板执行 `Extensions: Install from VSIX...` 选择该文件
-   - 或命令行：`cursor --install-extension neovide-cursor-injector-1.2.0.vsix`
+   - 或命令行：`cursor --install-extension neovide-cursor-injector-1.2.5.vsix`
 3. **完全重启编辑器**（不是 Reload Window）
 4. 完成！打字时即可看到弹性光标动画
 
-1. Download the latest `neovide-cursor-injector-1.2.0.vsix` from [Releases](https://github.com/yyyyolo7a79-sketch/neocursor-fix/releases).
+1. Download the latest `neovide-cursor-injector-1.2.5.vsix` from [Releases](https://github.com/yyyyolo7a79-sketch/neocursor-fix/releases).
 2. Install it:
    - VS Code / Cursor: run `Extensions: Install from VSIX...` and pick the file
-   - Or via CLI: `cursor --install-extension neovide-cursor-injector-1.2.0.vsix`
+   - Or via CLI: `cursor --install-extension neovide-cursor-injector-1.2.5.vsix`
 3. **Fully restart the editor** (not Reload Window).
 4. Done! You'll see the elastic cursor animation while typing.
 
@@ -109,6 +109,33 @@ A: Before uninstalling, restore `workbench.html` (remove the two injected lines 
 ---
 
 ## 📝 更新日志 / Changelog
+
+### v1.2.5
+- 🐛 修复**快速连续输入（按住键不放）时拖尾与光标"分家"、看起来像两个光标**的问题：
+  此前"前缘角点"（移动方向上的角点）的吸附时长为 0.02s，而每输入一个字符、光标跳变
+  之后，弹簧在一帧内只能衰减约三成——留下约 5px 的持续滞后。真实光标仅约 2px 宽，
+  形状前缘因此脱离光标本体，观感上就是"两个光标"。现改为**瞬时贴合**（吸附时长 0，
+  对任意帧率恒生效）：形状前缘始终贴住光标，尾巴形态与弹性由其余角点产生，不受影响。
+  实测（真实 VS Code + CDP 逐帧像素测量）：快速输入下"形状与光标有重叠的帧"占比
+  **68% → 99%**；按住左键乱晃下 **89% → 96%**，前缘分离 P95 从持续 22px 降至
+  -1px（覆盖），只剩光标跳变瞬间的单帧同步瞬态（浏览器事件循环的理论下限）。
+
+<details>
+<summary>v1.2.5 (English)</summary>
+
+- 🐛 Fixed the trail "splitting away" from the caret during fast repeated typing
+  (holding a key down), which looked like two cursors. The leading corners' snap
+  duration was 0.02s, and after each caret jump the spring decayed only ~30% within
+  one frame, leaving a persistent ~5px lag. Real carets are only ~2px wide, so the
+  shape's leading edge detached from the caret body. Now the leading edge snaps
+  **instantly** (snap duration 0, frame-rate independent), while the tail shape and
+  elasticity still come from the trailing corners.
+  Measured on real VS Code via CDP frame-level pixel sampling: frames where the shape
+  overlaps the caret went **68% → 99%** during fast typing and **89% → 96%** while
+  swinging with the left button held; leading-edge separation P95 dropped from a
+  persistent 22px to -1px (covering), leaving only single-frame sync transients
+  (the browser event-loop floor).
+</details>
 
 ### v1.2.4
 - 🐛 修复**快速移动 / 拖动乱晃时拖尾"追不上"光标**的问题：拖尾滞后 = 移动速度 × 弹簧

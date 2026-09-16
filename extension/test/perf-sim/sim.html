@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="utf-8" />
+<title>neovide-cursor 仿真测试台</title>
+<style>
+  /* 模拟 Monaco 编辑器的最小 DOM 结构 */
+  html, body { margin: 0; height: 100%; background: #1e1e1e; }
+  .monaco-editor { position: relative; width: 900px; height: 400px; margin: 120px auto; background: #1e1e1e; }
+  .cursors-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
+  .cursor { position: absolute; width: 8px; height: 18px; background: #d4d4d4; }
+</style>
+</head>
+<body>
+  <div class="monaco-editor">
+    <div class="cursors-layer">
+      <div class="cursor" id="caret" style="left: 100px; top: 120px"></div>
+    </div>
+  </div>
+
+  <script>
+  /* ============ 页面内探针与场景控制（仅测试用） ============ */
+  (function () {
+    const caret = document.getElementById("caret");
+    const samples = (window.__samples = []);
+
+    /* ============ 模拟推进（rAF 驱动，与渲染帧同步） ============
+       关键：移动必须发生在帧边界上，否则"光标已跳、画布未更新"的相位差会被
+       误测成几何分离（历史教训）。时序设计：本函数在采样**之后**执行，
+       于是下一帧采样到的 (canvas, caret) 同属一个渲染帧的状态。 */
+    let sim = null; // { kind, intervalMs, stepPx, x, y, nextAt, endAt }
+
+    function step() {
+      if (!sim) return;
+      const now = performance.now();
+      if (now >= sim.endAt) { sim = null; return; }
+      while (now >= sim.nextAt) {
+        if (sim.kind === "linear") {
+          sim.x += sim.stepPx;
+        } else { // 随机游走
+          sim.x += (Math.random() * 2 - 1) * sim.stepPx;
+          sim.y += (Math.random() * 2 - 1) * sim.stepPx;
+          sim.x = Math.max(20, Math.min(760, sim.x));
+          sim.y = Math.max(20, Math.min(280, sim.y));
+        }
+        moveTo(sim.x, sim.y);
+        fireEvents("a");
+        sim.nextAt += sim.intervalMs;
+      }
+    }
+
+    /* 每帧采样：canvas 实心像素的范围 vs 光标当前位置。
+       采样范围限制在 y ∈ [100, 500]，覆盖所有场景的光标活动区域。 */
+    const SY = 100, SH = 400;
+
+    function probe() {
+      const canvas = document.querySelector("canvas"); // 注入脚本创建的全屏 canvas
+      if (canvas && canvas.width > 0 && canvas.height >= SY + SH) {
+        const ctx = canvas.getContext("2d");
+        const cw = canvas.width;
+        const img = ctx.getImageData(0, SY, cw, SH); // 注意：每帧新分配，测试环境可接受
+        const d = img.data;
+        let minX = 1e9, maxX = -1e9, minY = 1e9, maxY = -1e9, n = 0;
+        for (let y = 0; y < SH; y++) {
+          const row = y * cw * 4;
+          for (let x = 0; x < cw; x++) {
+            if (d[row + x * 4 + 3] > 200) { // 只统计实心区域（忽略阴影外缘的淡像素）
+              if (x < minX) minX = x;
+              if (x > maxX) maxX = x;
+              if (y < minY) minY = y + SY;
+              if (y > maxY) maxY = y + SY;
+              n++;
+            }
+          }
+        }
+        const r = caret.getBoundingClientRect();
+        samples.push({
+          t: performance.now(),
+          caretX: r.left, caretY: r.top, caretR: r.right, caretB: r.bottom,
+          minX, maxX, minY, maxY, n,
+          op: parseFloat(canvas.style.opacity || "0"),
+        });
+      }
+      step(); // 采样之后才推进模拟（保证同帧一致）
+      requestAnimationFrame(probe);
+    }
+    requestAnimationFrame(probe);
+
+    /* ============ 场景控制 ============ */
+    const S = {};
+    /* 派发"可能改变光标"的事件（脚本用脏标记监听这些事件） */
+    const fireEvents = (k) => {
+      window.dispatchEvent(new KeyboardEvent("keydown", { key: k, bubbles: true }));
+      document.dispatchEvent(new Event("selectionchange"));
+    };
+    const moveTo = (x, y) => {
+      caret.style.left = x + "px";
+      if (y != null) caret.style.top = y + "px";
+    };
+
+    S.reset = () => {
+      sim = null;
+      moveTo(100, 120);
+      samples.length = 0;
+    };
+
+    const linearScene = (intervalMs, stepPx, durationMs) => {
+      S.reset();
+      const t = performance.now();
+      sim = { kind: "linear", intervalMs, stepPx, x: 100, y: 120, nextAt: t + intervalMs, endAt: t + durationMs };
+    };
+
+    /* 场景 1：按住键不放（key repeat，默认 33ms 前进 8px —— 用户报告的场景） */
+    S.keyRepeat = (o) => linearScene(o?.intervalMs ?? 33, o?.stepPx ?? 8, o?.durationMs ?? 2000);
+
+    /* 场景 2：手动打字节奏（默认 160ms 前进 8px） */
+    S.typing = (o) => linearScene(o?.intervalMs ?? 160, o?.stepPx ?? 8, o?.durationMs ?? 2400);
+
+    /* 场景 3：鼠标乱晃（每帧 ±20px 随机游走的拖动选择模拟） */
+    S.swing = (o) => {
+      S.reset();
+      const t = performance.now();
+      sim = {
+        kind: "swing",
+        intervalMs: o?.intervalMs ?? 16, stepPx: o?.stepPx ?? 20,
+        x: 300, y: 120, nextAt: t, endAt: t + (o?.durationMs ?? 1500),
+      };
+    };
+
+    /* 场景 4：单次大跳（+400px 瞬移一次） */
+    S.jumpOnce = () => {
+      S.reset();
+      moveTo(500, 120);
+      fireEvents("x");
+    };
+
+    window.__scene = S;
+    window.__sceneReady = true;
+  })();
+  </script>
+
+  <!-- 被测脚本：与注入编辑器的是同一份文件（每次运行由驱动脚本复制最新版） -->
+  <script src="./neovide-cursor.js"></script>
+</body>
+</html>
