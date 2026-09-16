@@ -23,6 +23,10 @@ const cursorConfig = {
   canvasFadeTransitionCss: "opacity 0.075s ease-out",
   nativeCursorDisappearTransitionCss: "opacity 0s ease-out",
   nativeCursorRevealTransitionCss: "opacity 0.075s ease-in",
+  // v1.2.1 新增：是否隐藏原生光标。
+  //   true（默认）= 完整 Neovide 效果：原生光标隐去，完全由 canvas 动画光标呈现
+  //   false        = 保留原生光标，canvas 仅叠加拖尾（早期的实际行为）
+  hideNativeCursor: true,
 };
 /* __AUTO_CONFIG_END__ */
 
@@ -324,6 +328,24 @@ const createNeovideCursor = ({ canvas }) => {
 };
 
 // === SECTION 7: 全局光标管理器 (Global Cursor Manager) ===
+//
+// v1.2.1 性能重构（修复宿主渲染进程崩溃问题）：
+//   旧实现用 MutationObserver 全量监听 document.body —— 宿主每秒发生数百上千次
+//   DOM 变化，每次回调都执行一次全文档 querySelectorAll，叠加渲染循环内每帧的
+//   强制布局读取（getBoundingClientRect），在高负载场景（宿主启动洪流）会把渲染
+//   主线程拖入崩溃。重构为：
+//     1. 脏标记 + 帧内消费：输入/选择类事件只置位标记（近零成本），渲染帧消费
+//        标记时才做一次位置读取，且只针对已知光标（成本 O(光标数)）
+//     2. 低频兜底扫描（SYNC_INTERVAL）：负责发现新光标 / 回收消失光标
+//     3. 延迟启动（START_DELAY）：页面 load 后再延迟启动，避开宿主启动期的
+//        DOM 洪流（崩溃循环的直接诱因）
+//     4. 空闲/后台暂停：页面不可见时挂起渲染循环
+//     5. 渲染帧内零 DOM 读取：位置用扫描阶段缓存，绘制阶段纯内存运算
+
+// 配置常量
+const MAX_CURSORS = 40; // 光标实例数量上限（自我保护，防异常场景下无限增长）
+const SYNC_INTERVAL = 400; // 全量扫描间隔（ms）
+const START_DELAY = 1500; // 页面 load 后的启动延迟（ms）
 
 // GlobalCursorManager 类: 系统的控制塔：负责扫描 DOM 节点、同步多光标实例、控制原生光标的显隐以及渲染 Canvas
 class GlobalCursorManager {
@@ -333,6 +355,12 @@ class GlobalCursorManager {
     this.ctx = this.canvas.getContext("2d");
     this.isScrolling = false; // 滚动状态锁
     this.winW = window.innerWidth;
+    // —— v1.2.1 性能重构新增状态 ——
+    this.needsSync = false; // 脏标记：有事件提示光标可能变化
+    this.lastFullSync = 0; // 上次全量扫描的时间戳（ms）
+    this.loopBound = this.loop.bind(this); // 只绑定一次，避免每帧新建函数
+    this.paused = document.hidden; // 页面隐藏时暂停渲染
+    this.errLogged = false; // 循环异常只上报一次，避免刷屏
     this.init();
   }
 
@@ -375,108 +403,103 @@ class GlobalCursorManager {
       "scroll",
       () => {
         this.isScrolling = true;
+        this.needsSync = true; // 滚动会改变光标位置，置脏
         clearTimeout(this.sT);
         this.sT = setTimeout(() => (this.isScrolling = false), 100);
       },
       { capture: true, passive: true },
     );
 
-    this.initObserver();
-    this.loop();
-  }
-
-  initObserver() {
-    const observer = new MutationObserver(() => {
-      this.syncCursors();
-    });
-
-    observer.observe(document.body, {
-      childList: true,
-      subtree: true,
-    });
-
-    this.syncCursors();
-  }
-
-  // scan 方法: 探测并匹配 DOM 元素与物理实例
-  syncCursors() {
-    const els = document.querySelectorAll(".monaco-editor .cursor");
-    const seen = new Set();
-
-    els.forEach((el) => {
-      seen.add(el);
-
-      if (this.cursors.has(el)) return;
-
-      const r = el.getBoundingClientRect();
-      if (r.left <= 0 && r.top <= 0) return;
-
-      const inst = createNeovideCursor({ canvas: this.canvas });
-      inst.updateSize(r.width, r.height);
-
-      inst.move(
-        r.left,
-        r.top,
-        globalCursorState.lastX
-          ? { x: globalCursorState.lastX, y: globalCursorState.lastY }
-          : null,
-      );
-
-      this.cursors.set(el, {
-        instance: inst,
-        lastX: r.left,
-        lastY: r.top,
-        isActive: false,
-      });
-    });
-
-    // 回收不存在的光标
-    for (const el of this.cursors.keys()) {
-      if (!seen.has(el) || !el.isConnected) {
-        this.cursors.delete(el);
-      }
+    // 脏标记事件源（v1.2.1）：这些事件都可能让光标移动/显示状态变化。
+    // 只置位标记（近零成本），真正的 DOM 读取推迟到渲染帧内消费一次，
+    // 替代旧版"MutationObserver 全量监听 → 每次变化全文档查询"的方案。
+    const markDirty = () => {
+      this.needsSync = true;
+    };
+    for (const evt of [
+      "keydown",
+      "keyup",
+      "mousedown",
+      "mouseup",
+      "focusin",
+      "focusout",
+    ]) {
+      window.addEventListener(evt, markDirty, { capture: true, passive: true });
     }
+    document.addEventListener("selectionchange", markDirty, { passive: true });
+
+    // 页面可见性：切后台暂停渲染循环（省电），回前台恢复
+    document.addEventListener("visibilitychange", () => {
+      this.paused = document.hidden;
+      if (!this.paused) {
+        this.needsSync = true;
+        requestAnimationFrame(this.loopBound);
+      }
+    });
+
+    this.lastFullSync = performance.now();
+    this.syncCursors(true); // 首次全量扫描
+    requestAnimationFrame(this.loopBound);
   }
 
-  // 显隐逻辑提取为独立函数（降低复杂度）
-  updateVisibility(isAnyAnimating) {
-    if (isAnyAnimating) {
-      this.canvas.style.transition = "none";
-      if (this.canvas.style.opacity !== "1") {
-        this.canvas.style.transition = "none";
-        this.canvas.style.opacity = "1";
-      }
-      this.cursors.forEach((d) => {
-        if (d.isActive && d.target) {
-          d.target.style.transition =
-            cursorConfig.nativeCursorDisappearTransitionCss;
-          d.target.style.opacity = "0";
+  /**
+   * 扫描并同步光标状态（v1.2.1：本函数是全脚本唯一的 DOM 读取点）。
+   *
+   * @param {boolean} full true  = 全量扫描：querySelectorAll 发现新光标、回收消失光标
+   *                       false = 增量同步：只更新已知光标的位置/可见性（成本 O(光标数)）
+   *
+   * 设计说明：
+   *  - 读取集中成批执行、且只读不写（写操作全部在后续 canvas 绘制阶段），
+   *    避免读写交替引发浏览器的重复布局计算；
+   *  - 全量路径由低频兜底（SYNC_INTERVAL），增量路径由输入事件脏标记驱动，
+   *    打字响应不受低频兜底影响。
+   */
+  syncCursors(full) {
+    if (full) {
+      // —— 全量路径：发现新元素、回收消失元素 ——
+      const els = document.querySelectorAll(".monaco-editor .cursor");
+      const seen = new Set();
+
+      els.forEach((el) => {
+        seen.add(el);
+
+        if (this.cursors.has(el)) return;
+
+        // 自我保护：实例数量异常增长时停止新建（宿主 DOM 异常场景下避免拖垮渲染进程）
+        if (this.cursors.size >= MAX_CURSORS) return;
+
+        const r = el.getBoundingClientRect();
+        if (r.left <= 0 && r.top <= 0) return;
+
+        const inst = createNeovideCursor({ canvas: this.canvas });
+        inst.updateSize(r.width, r.height);
+
+        inst.move(
+          r.left,
+          r.top,
+          globalCursorState.lastX
+            ? { x: globalCursorState.lastX, y: globalCursorState.lastY }
+            : null,
+        );
+
+        this.cursors.set(el, {
+          instance: inst,
+          target: el, // v1.2.1 修复：旧版缺少该字段，导致原生光标隐藏逻辑从未生效
+          lastX: r.left,
+          lastY: r.top,
+          isActive: false,
+        });
+      });
+
+      // 回收不存在的光标
+      for (const el of this.cursors.keys()) {
+        if (!seen.has(el) || !el.isConnected) {
+          this.cursors.delete(el);
         }
-      });
-      return;
-    }
-
-    if (this.canvas.style.opacity === "1") {
-      setTimeout(() => {
-        this.canvas.style.transition = cursorConfig.canvasFadeTransitionCss;
-        this.canvas.style.opacity = "0";
-      }, cursorConfig.cursorDisappearDelay);
-    }
-
-    this.cursors.forEach((d) => {
-      if (d.isActive && d.target) {
-        d.target.style.transition =
-          cursorConfig.nativeCursorRevealTransitionCss;
-        d.target.style.opacity = "1";
       }
-    });
-  }
+    }
 
-  // loop 方法: 顶层渲染引擎, 控制每一帧的最终输出
-  loop() {
-    this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
-    let isAnyAnimating = false;
-
+    // —— 位置/可见性更新（全量与增量两条路径共用）——
     for (const [el, data] of this.cursors) {
       if (!el.isConnected) {
         this.cursors.delete(el);
@@ -496,6 +519,7 @@ class GlobalCursorManager {
 
       if (!isNowActive) {
         data.isActive = false;
+        data.rect = r; // 缓存位置，供渲染帧判断视口可见性
         continue;
       }
 
@@ -519,8 +543,77 @@ class GlobalCursorManager {
       }
 
       data.isActive = isNowActive;
+      data.rect = r; // 缓存位置，渲染帧不再读取 DOM
+    }
+  }
 
-      if (isNowActive) {
+  // 显隐逻辑提取为独立函数（降低复杂度）
+  updateVisibility(isAnyAnimating) {
+    if (isAnyAnimating) {
+      if (this.canvas.style.opacity !== "1") {
+        this.canvas.style.transition = "none";
+        this.canvas.style.opacity = "1";
+      }
+      // v1.2.1：仅在开启 hideNativeCursor 时隐藏原生光标
+      if (cursorConfig.hideNativeCursor) {
+        this.cursors.forEach((d) => {
+          if (d.isActive && d.target) {
+            d.target.style.transition =
+              cursorConfig.nativeCursorDisappearTransitionCss;
+            d.target.style.opacity = "0";
+          }
+        });
+      }
+      return;
+    }
+
+    if (this.canvas.style.opacity === "1") {
+      // v1.2.1：句柄保存并去重，避免高频启停时堆积无用定时器
+      clearTimeout(this.fadeTimer);
+      this.fadeTimer = setTimeout(() => {
+        this.canvas.style.transition = cursorConfig.canvasFadeTransitionCss;
+        this.canvas.style.opacity = "0";
+      }, cursorConfig.cursorDisappearDelay);
+    }
+
+    if (cursorConfig.hideNativeCursor) {
+      this.cursors.forEach((d) => {
+        if (d.isActive && d.target) {
+          d.target.style.transition =
+            cursorConfig.nativeCursorRevealTransitionCss;
+          d.target.style.opacity = "1";
+        }
+      });
+    }
+  }
+
+  // loop 方法: 顶层渲染引擎, 控制每一帧的最终输出。
+  // v1.2.1：本函数不再读取 DOM（位置用扫描阶段缓存的 data.rect），
+  // 只做纯内存物理计算与 canvas 绘制。
+  loop() {
+    if (this.paused) return; // 页面隐藏时挂起，由 visibilitychange 恢复
+
+    try {
+      const now = performance.now();
+
+      // 1. DOM 读取阶段：
+      //    - 脏标记：输入/选择等事件后消费一次（保证打字时的响应速度）
+      //    - 低频兜底：每隔 SYNC_INTERVAL 全量扫描一次（发现新光标/位置漂移）
+      if (this.needsSync || now - this.lastFullSync >= SYNC_INTERVAL) {
+        const full = now - this.lastFullSync >= SYNC_INTERVAL;
+        if (full) this.lastFullSync = now;
+        this.needsSync = false;
+        this.syncCursors(full);
+      }
+
+      // 2. 绘制阶段：纯内存物理 + canvas 绘制
+      this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+      let isAnyAnimating = false;
+
+      for (const [el, data] of this.cursors) {
+        if (!data.isActive) continue;
+
+        const r = data.rect || el.getBoundingClientRect();
         const anim = data.instance.updateLoop(
           this.isScrolling,
           r.left >= 0 && r.top >= 0 && r.left <= this.winW,
@@ -528,12 +621,30 @@ class GlobalCursorManager {
         data.isAnimating = anim;
         if (anim) isAnyAnimating = true;
       }
+
+      this.updateVisibility(isAnyAnimating);
+    } catch (e) {
+      // 单帧异常不应终止整个渲染循环
+      if (!this.errLogged) {
+        console.warn("[NeovideCursor] 渲染循环异常:", e);
+        this.errLogged = true;
+      }
     }
 
-    this.updateVisibility(isAnyAnimating);
-    requestAnimationFrame(this.loop.bind(this));
+    requestAnimationFrame(this.loopBound);
   }
 }
 
-// 启动全局光标管理器
-new GlobalCursorManager();
+// ============ 启动（v1.2.1：延迟启动，避开宿主启动期的 DOM 洪流）============
+// 背景：注入脚本是普通 <script>（解析到即执行），而宿主的 workbench.js 是
+// module（延迟执行）——脚本若立即启动，会从宿主 UI 尚未构建时就开始承受启动期
+// 最猛烈的 DOM 变化，这正是"更新后渲染进程崩溃循环"的直接诱因。
+// 改为：页面 load 完成、且额外延迟 START_DELAY 后再启动。
+(function bootstrap() {
+  const start = () => setTimeout(() => new GlobalCursorManager(), START_DELAY);
+  if (document.readyState === "complete") {
+    start();
+  } else {
+    window.addEventListener("load", start, { once: true });
+  }
+})();

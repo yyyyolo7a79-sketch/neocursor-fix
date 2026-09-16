@@ -75,6 +75,15 @@ The original extension ([vscode-neovide-cursor](https://github.com/LengineerC/vs
 A: v1.2.0 起不再出现——注入后会自动同步产品校验值（`product.json` 的 `checksums`）。旧版扩展留下的提示点"不再提示"即可，不影响任何功能。
 A: Since v1.2.0 this no longer appears — the extension syncs the product checksum (`product.json` → `checksums`) after injecting. If an older version left the banner, click "Don't show again". It doesn't affect any functionality.
 
+> ⚠️ **请注意（排查编辑器异常时）**：由于校验值已被同步，编辑器**不会提示安装目录被本扩展修改**。
+> 判断注入是否生效的两个标志：安装目录下存在 `neovide-cursor.js` 与 `workbench.html.bak-*` 备份。
+> 完全恢复原状 = 删除注入的 script 标签 + 还原备份文件 + 卸载扩展。
+>
+> ⚠️ **Note (when troubleshooting the editor)**: since the checksum is synced, the editor will
+> **not** warn that its install directory was modified. Two indicators that injection is active:
+> the presence of `neovide-cursor.js` and a `workbench.html.bak-*` backup in the workbench
+> directory. To fully revert: remove the injected script tag, restore the backup, uninstall.
+
 ### Q: 编辑器更新后动画没了？/ Animation missing after an update?
 A: 不用管，扩展会在下次启动时自动重新注入（含更新器覆盖竞态的延时复核兜底）。
 A: Don't worry — the extension reinjects automatically on next startup (with delayed re-checks to cover update-overwrite races).
@@ -100,6 +109,35 @@ A: Before uninstalling, restore `workbench.html` (remove the two injected lines 
 ---
 
 ## 📝 更新日志 / Changelog
+
+### v1.2.1
+- 🐛 **修复渲染进程崩溃问题**：重构动画脚本的 DOM 监听与渲染循环 —— 旧版用
+  MutationObserver 全量监听 + 渲染循环内每帧强制布局读取，在宿主高负载场景
+  （如 VS Code 更新后的启动洪流）可能把渲染进程拖入崩溃循环
+  - 移除全量 MutationObserver，改为「事件脏标记 + 400ms 低频兜底扫描」
+  - 渲染帧内不再读取 DOM（位置使用扫描阶段缓存），消除每帧强制布局
+  - **延迟启动**（页面 load 后 1.5s）：避开宿主启动期的 DOM 洪流（崩溃循环的直接诱因）
+  - 页面切后台时暂停渲染循环；单帧异常不再终止整个循环
+  - 修复 `target` 字段缺失导致「隐藏原生光标」逻辑从未生效的 Bug
+    （如需保留旧版实际行为，可将 `hideNativeCursor` 设为 `false`）
+  - 光标实例数量上限保护（防异常场景下无限增长）
+
+<details>
+<summary>v1.2.1 (English)</summary>
+
+- 🐛 **Fixed renderer-process crashes**: reworked the animation script's DOM
+  observing and render loop (crash analysis and fix notes included)
+  - Removed the full-tree MutationObserver; now uses event dirty-flags + a
+    400ms low-frequency fallback scan
+  - Zero DOM reads inside the render frame (positions are cached during scans)
+  - **Delayed startup** (1.5s after page load) to avoid the host's startup DOM
+    flood — the direct trigger of the crash loop
+  - Render loop pauses when the page is hidden; a single-frame error no longer
+    kills the whole loop
+  - Fixed the missing `target` field that silently disabled native-cursor hiding
+    (set `hideNativeCursor: false` to keep the old actual behavior)
+  - Cursor-instance cap as a self-protection measure
+</details>
 
 ### v1.2.0
 - ✅ 新增 **Cursor 支持**（自动探测 `electron-sandbox` 目录结构）

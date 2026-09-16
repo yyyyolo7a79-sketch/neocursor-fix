@@ -96,10 +96,18 @@ function runCase(label, srcAppDir, tmpRoot) {
 		prodValid = false;
 	}
 	check(prodValid, "product.json 仍是合法 JSON");
-	check(
-		fs.existsSync(prodPath + ".bak-neovide"),
-		"product.json 已生成首次备份（.bak-neovide）",
-	);
+	// 备份仅在"校验值确实被修改"（updated）时生成；源文件已同步（already）时无需备份
+	if (r1.checksum === "updated") {
+		check(
+			fs.existsSync(prodPath + ".bak-neovide"),
+			"product.json 已生成首次备份（.bak-neovide）",
+		);
+	} else {
+		check(
+			!fs.existsSync(prodPath + ".bak-neovide"),
+			"校验值本就一致（already），未产生多余备份",
+		);
+	}
 
 	// --- 第二轮：幂等 ---
 	const r2 = core.inject({ extensionPath: EXT_DIR, appRoot: appDir });
