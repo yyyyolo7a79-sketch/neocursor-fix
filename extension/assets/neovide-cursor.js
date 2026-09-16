@@ -29,12 +29,6 @@ const cursorConfig = {
   // 废掉了收缩下限，导致快速移动时整条拖尾消失）。
   // 尾巴的长度与弹性由其余角点的时长（短 0.05 / 远 0.1）决定，不受此项影响。
   snapAnimationLength: 0,
-  // 瞬移位移阈值（px，v1.2.8）：单帧位移超过此值的移动（跨行跳跃、甩到屏幕
-  // 远端）判定为"瞬移"，全部角点立即贴合——避免形状被拉伸成"追不上"的大团
-  //（实测跨行 664px/33ms、拉伸达 15px+）。低于阈值的连续移动（打字、拖动）
-  // 保持 v1.2.0 的长拖尾体系（短 0.05 / 远 0.1）。用"位移"而非"速度"判定：
-  // 速度对 rAF 帧间隔抖动敏感，偶发短间隔会把普通拖动误判为高速。
-  teleportDistanceThreshold: 300,
   canvasFadeTransitionCss: "opacity 0.075s ease-out",
   nativeCursorDisappearTransitionCss: "opacity 0s ease-out",
   nativeCursorRevealTransitionCss: "opacity 0.075s ease-in",
@@ -186,19 +180,9 @@ class Corner {
       ? cursorConfig.leadingSnapFactor
       : (this.TRAIL_FACTORS[rank] ?? 1);
 
-    // v1.2.8：瞬移判定 —— 跨行跳跃（y 位移达到一行高，含上下键/换行）或超大幅
-    // 单帧位移（甩到屏幕远端）。这类移动会把形状拉成横跨的"大团"或产生
-    // 多帧滞后；直接全部角点瞬时贴合。
-    const dyPx = Math.abs(dest.y - this.pd.y);
-    const distPx = dist * dim.width;
-    const isTeleport =
-      dyPx >= dim.height * 0.8 || distPx >= cursorConfig.teleportDistanceThreshold;
-
     const lenAnim = useSnap
       ? cursorConfig.snapAnimationLength
-      : isTeleport
-        ? 0
-        : baseTime * cursorClamp(factor, 0, 1);
+      : baseTime * cursorClamp(factor, 0, 1);
 
     this.ax.animationLength = lenAnim;
     this.ay.animationLength = lenAnim;
