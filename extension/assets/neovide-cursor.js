@@ -19,15 +19,11 @@ const cursorConfig = {
   leadingSnapThreshold: 0.5,
   animationResetThreshold: 0.09,
   maxTrailDistanceFactor: 60,
-  // 前缘（移动方向上的角点）吸附时长。
-  // v1.2.5：0.02 → 0（瞬时贴合）。弹簧更新里有 "animationLength <= dt
-  // → 直接归位" 的短路：0 对任意帧率恒成立，前缘角每次移动后立即到位
-  // （除零慢路径被短路保护，不会执行）。
-  // 这是"看起来只有一个光标"的关键——此前 0.02 时每次光标跳变后弹簧一帧
-  // 只衰减约三成（实测跳变后残留滞后 ≈5px），而真实光标仅约 2px 宽，前缘会
-  // 脱离光标本体，观感上就是"两个光标"。尾巴形态与弹性由其余角点的滞后产生，
-  // 不受此项影响。
-  snapAnimationLength: 0,
+  // 吸附角（移动方向上的角点）的动画时长。
+  // v1.2.6：恢复为 v1.2.0 的 0.02。v1.2.5 曾改为 0（前缘瞬时贴合），但该值
+  // 同时是「快速移动收缩」公式的下限，置 0 会让快速移动时拖尾瞬间消失
+  // （用户实测：「拖尾怎么这么快，还没看到就消失了」）。
+  snapAnimationLength: 0.02,
   canvasFadeTransitionCss: "opacity 0.075s ease-out",
   nativeCursorDisappearTransitionCss: "opacity 0s ease-out",
   nativeCursorRevealTransitionCss: "opacity 0.075s ease-in",
@@ -157,32 +153,31 @@ class Corner {
     const dist = Math.hypot(jv.x, jv.y); // 本次移动距离（相对光标尺寸的倍数）
     const jvNorm = dist ? { x: jv.x / dist, y: jv.y / dist } : { x: 0, y: 0 };
 
+    // 动画时长体系（v1.2.6 恢复为 v1.2.0 原版 —— 拖尾速度的事实基准）：
+    //   短距离（≤ shortMoveThreshold）：shortAnimationLength（0.05）× trailFactor
+    //   远距离：animationLength（0.1）× trailFactor —— 更长，拖尾更明显、更持久
+    //   吸附角（移动方向上的角点）：snapAnimationLength（0.02）
+    // 注：v1.2.4 的「速度自适应」（按距离反比收缩）与 v1.2.5 的「前缘瞬时
+    // 贴合」已回退——实测它们在真实环境（光标仅约 2px 宽，dist 按光标宽
+    // 归一化导致 16px 移动即触发收缩）下把远距离拖尾压到几乎为 0，观感上
+    // 「拖尾还没看到就消失」，与 v1.2.0 的长拖尾基准完全相反。
+    const isShortMove = dist <= cursorConfig.shortMoveThreshold;
+    const baseTime = isShortMove
+      ? cursorConfig.shortAnimationLength
+      : cursorConfig.animationLength;
+
     const alignment = jvNorm.x * this.rpNorm.x + jvNorm.y * this.rpNorm.y;
 
     const useSnap =
       cursorConfig.useHardSnap && alignment > cursorConfig.leadingSnapThreshold;
 
-    let lenAnim;
-    if (useSnap) {
-      lenAnim = cursorConfig.snapAnimationLength;
-    } else if (dist <= cursorConfig.shortMoveThreshold) {
-      // 短距离（打字、小范围移动）：保持原有的丝滑拖尾
-      lenAnim =
-        cursorConfig.shortAnimationLength *
-        cursorClamp(this.TRAIL_FACTORS[rank] ?? 1, 0, 1);
-    } else {
-      // 远距离：速度自适应（v1.2.4）。
-      // 滞后距离 ≈ 移动速度 × 弹簧时间常数；时间常数固定时，移动越快拖尾被
-      // 甩得越远（"一直在追"）。此处按移动距离反比收缩时长，距离越远越贴近，
-      // 下限为吸附时长，保证快速移动时拖尾主动收敛而非失控拉长。
-      const shrink = cursorConfig.shortMoveThreshold / dist;
-      lenAnim = Math.max(
-        cursorConfig.snapAnimationLength,
-        cursorConfig.animationLength *
-          cursorClamp(this.TRAIL_FACTORS[rank] ?? 1, 0, 1) *
-          shrink,
-      );
-    }
+    const factor = useSnap
+      ? cursorConfig.leadingSnapFactor
+      : (this.TRAIL_FACTORS[rank] ?? 1);
+
+    const lenAnim = useSnap
+      ? cursorConfig.snapAnimationLength
+      : baseTime * cursorClamp(factor, 0, 1);
 
     this.ax.animationLength = lenAnim;
     this.ay.animationLength = lenAnim;
@@ -192,7 +187,6 @@ class Corner {
       this.ay.reset();
     }
   }
-
   update(dim, c, dt, imm) {
     const destX = c.x + this.rp.x * dim.width;
     const destY = c.y + this.rp.y * dim.height;

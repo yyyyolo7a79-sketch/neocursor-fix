@@ -33,17 +33,17 @@ The original extension ([vscode-neovide-cursor](https://github.com/LengineerC/vs
 
 ## 🚀 快速开始 / Quick Start
 
-1. 从 [Releases](https://github.com/yyyyolo7a79-sketch/neocursor-fix/releases) 下载最新 `neovide-cursor-injector-1.2.5.vsix`
+1. 从 [Releases](https://github.com/yyyyolo7a79-sketch/neocursor-fix/releases) 下载最新 `neovide-cursor-injector-1.2.6.vsix`
 2. 安装扩展：
    - VS Code / Cursor：命令面板执行 `Extensions: Install from VSIX...` 选择该文件
-   - 或命令行：`cursor --install-extension neovide-cursor-injector-1.2.5.vsix`
+   - 或命令行：`cursor --install-extension neovide-cursor-injector-1.2.6.vsix`
 3. **完全重启编辑器**（不是 Reload Window）
 4. 完成！打字时即可看到弹性光标动画
 
-1. Download the latest `neovide-cursor-injector-1.2.5.vsix` from [Releases](https://github.com/yyyyolo7a79-sketch/neocursor-fix/releases).
+1. Download the latest `neovide-cursor-injector-1.2.6.vsix` from [Releases](https://github.com/yyyyolo7a79-sketch/neocursor-fix/releases).
 2. Install it:
    - VS Code / Cursor: run `Extensions: Install from VSIX...` and pick the file
-   - Or via CLI: `cursor --install-extension neovide-cursor-injector-1.2.5.vsix`
+   - Or via CLI: `cursor --install-extension neovide-cursor-injector-1.2.6.vsix`
 3. **Fully restart the editor** (not Reload Window).
 4. Done! You'll see the elastic cursor animation while typing.
 
@@ -109,6 +109,40 @@ A: Before uninstalling, restore `workbench.html` (remove the two injected lines 
 ---
 
 ## 📝 更新日志 / Changelog
+
+### v1.2.6
+- ⏪ **回退 v1.2.4 / v1.2.5 的动画时长改动，恢复 v1.2.0 的时长体系**（拖尾速度以 v1.2.0 为准）：
+  - 移除 v1.2.4 的「速度自适应」——它让**移动越远、拖尾时长越短**（与 v1.2.0 的
+    「远距离使用更长的 animationLength（0.1s）」正好相反），且距离阈值按"光标宽度的
+    倍数"计算：真实光标仅约 2px 宽，**移动 16px 即触发收缩**，实际观感反而丢掉拖尾。
+  - 撤销 v1.2.5 的「前缘瞬时贴合」——该改动本意是消除快速输入时前缘约 5px 的滞后，
+    但它同时把「快速移动收缩」公式的下限置为了 0，导致快速移动时拖尾瞬间消失
+    （实测反馈：「拖尾怎么这么快，还没看到就消失了」）。
+- 现在：短距离 0.05s / 远距离 0.1s / 吸附角 0.02s（均为 v1.2.0 原值），快速移动与
+  拖动时重新有清晰、持久、可见的长拖尾。
+- 实测（sim 固定场景，2px 光标，形状总宽度 = 拖尾可见度）——快速移动场景：
+  **v1.2.0 基准 142.6px / v1.2.5 仅 8.7px / v1.2.6 恢复至 98.5px**（同量级）。
+- v1.2.1~v1.2.3 的性能重构、事件源补全、原生光标保留等改动**全部保留**。
+
+<details>
+<summary>v1.2.6 (English)</summary>
+
+- ⏪ **Reverted the v1.2.4/v1.2.5 animation-duration changes; restored the v1.2.0 duration
+  system** (the reference for trail speed):
+  - Removed v1.2.4's "speed adaptation" — it made the trail **shorter the farther you moved**
+    (the opposite of v1.2.0, where long moves use the longer `animationLength` of 0.1s), and
+    its distance threshold is measured in *cursor widths*: real carets are only ~2px wide, so
+    **any move over 16px triggered the shrink**, which in practice just killed the trail.
+  - Undid v1.2.5's "instant leading-edge snap" — intended to remove the leading edge's ~5px
+    lag during fast typing, but it also zeroed the floor of the shrink formula, making the
+    trail vanish instantly on fast movement (user feedback: "the trail is gone before I can
+    even see it").
+- Now: short moves 0.05s / long moves 0.1s / snapping corners 0.02s (all v1.2.0 values);
+  fast movement and dragging produce a clear, persistent, visible long trail again.
+- Measured (fixed sim scene, 2px caret, shape width = trail visibility) — fast-move scene:
+  **v1.2.0 baseline 142.6px / v1.2.5 only 8.7px / v1.2.6 restored to 98.5px** (same order).
+- All v1.2.1–v1.2.3 changes (performance rework, event sources, native cursor) are kept.
+</details>
 
 ### v1.2.5
 - 🐛 修复**快速连续输入（按住键不放）时拖尾与光标"分家"、看起来像两个光标**的问题：

@@ -20,7 +20,8 @@ const { chromium } = require(PW);
 
 const VSCODE_EXE = "D:/develop/Microsoft VS Code/Code.exe";
 const WB_DIR = "D:/develop/Microsoft VS Code/645f29cc31/resources/app/out/vs/code/electron-browser/workbench";
-const SRC_SCRIPT = path.resolve(__dirname, "..", "..", "assets", "neovide-cursor.js");
+// NC_SCRIPT：可指定任意脚本文件作为被测对象（用于与历史版本做基准对照）
+const SRC_SCRIPT = process.env.NC_SCRIPT || path.resolve(__dirname, "..", "..", "assets", "neovide-cursor.js");
 
 const PORT = 9333;
 const PROFILE = path.join(os.tmpdir(), "neovide-cdp-profile");
@@ -54,8 +55,8 @@ const f1 = (v) => (v == null ? "-" : v.toFixed(1));
      "    move: (x, y, fromSource = null) => {\n      window.__ncMoveCount = (window.__ncMoveCount || 0) + 1;"],
   ];
   for (const [o, n] of patches) {
-    if (!code.includes(o)) throw new Error("诊断补丁锚点未找到（源码变动？）: " + o.slice(0, 50));
-    code = code.replace(o, n);
+    if (code.includes(o)) code = code.replace(o, n);
+    else console.log("  （诊断补丁锚点缺失，跳过一项——历史版本对照时正常）");
   }
   fs.writeFileSync(path.join(WB_DIR, "neovide-cursor.js"), code);
   console.log("✅ 工作副本（含诊断钩子）已复制到 VS Code 注入位置");
@@ -248,7 +249,8 @@ const f1 = (v) => (v == null ? "-" : v.toFixed(1));
     await page.keyboard.press("a");
     await sleep(33);
   }
-  await sleep(300);
+  await page.evaluate(() => { window.__stoppedAt = performance.now(); }); // 记录停止时刻，供收敛测量
+  await sleep(400);
 
   // 11. 统计
   async function sampleStats(label) {
@@ -278,6 +280,17 @@ const f1 = (v) => (v == null ? "-" : v.toFixed(1));
     for (let i = 1; i < valid.length; i++) dts.push(valid[i].t - valid[i - 1].t);
     const DT = st(dts);
     if (DT) console.log(`  探针帧间隔            : 均值 ${f1(DT.m)}ms（约 ${(1000 / Math.max(DT.m, 1)).toFixed(0)}fps）`);
+    // 停止后拖尾收敛：形状宽度回到 ≤2px 所需时间 —— 直接量化"拖尾消失快慢"
+    const stopAt = await page.evaluate(() => window.__stoppedAt || 0);
+    if (stopAt) {
+      const after = valid.filter((f) => f.t >= stopAt && f.maxX != null).sort((a, b) => a.t - b.t);
+      let conv = null, maxW = 0;
+      for (const f of after) {
+        maxW = Math.max(maxW, f.maxX - f.minX);
+        if (f.maxX - f.minX <= 2) { conv = f.t - stopAt; break; }
+      }
+      console.log(`  停止后拖尾收敛        : ${conv == null ? "> 采样窗口" : conv.toFixed(0) + "ms"}（停止时残留拖尾宽 ${f1(maxW)}px → 收回 ≤2px 的用时）`);
+    }
   }
 
   await sampleStats("键盘快速输入（33ms/字符）");
@@ -289,7 +302,7 @@ const f1 = (v) => (v == null ? "-" : v.toFixed(1));
     const c = document.querySelector(".monaco-editor .cursor").getBoundingClientRect();
     return { l: r.left, t: r.top, r: r.right, b: r.bottom, cx: c.left + 1, cy: c.top + 9 };
   });
-  await page.evaluate(() => { window.__real.length = 0; });
+  await page.evaluate(() => { window.__real.length = 0; window.__stoppedAt = 0; });
   // 同步即时性验证：在 mousemove 事件的同一 JS 任务里读光标 DOM 位置，
   // 与鼠标事件坐标对比 → 判断"滞后"是我们脚本的同步延迟，还是 VS Code 本身的延迟
   await page.evaluate(() => {
@@ -321,7 +334,8 @@ const f1 = (v) => (v == null ? "-" : v.toFixed(1));
     await sleep(16);
   }
   await page.mouse.up();
-  await sleep(300);
+  await page.evaluate(() => { window.__stoppedAt = performance.now(); });
+  await sleep(400);
   await sampleStats("按住左键乱晃（拖动选择）");
 
   // 同步即时性统计：区分"VS Code 自身延迟"与"我们脚本的帧内同步延迟"

@@ -16,7 +16,8 @@ const PW = process.env.PW_PATH || "C:/Users/PC/AppData/Roaming/npm/node_modules/
 const { chromium } = require(PW);
 
 const SIM_DIR = __dirname;
-const SRC = path.resolve(SIM_DIR, "..", "..", "assets", "neovide-cursor.js");
+// NC_SCRIPT：可指定任意脚本文件作为被测对象（用于与历史版本做基准对照）
+const SRC = process.env.NC_SCRIPT || path.resolve(SIM_DIR, "..", "..", "assets", "neovide-cursor.js");
 
 // 每次运行都复制最新脚本（防止测到旧版——历史踩坑：浏览器缓存 / 文件过期）
 fs.copyFileSync(SRC, path.join(SIM_DIR, "neovide-cursor.js"));
@@ -65,9 +66,10 @@ function report(name, all) {
   });
   const F = st(front), T = st(trail), W = st(width), C = st(cover);
   const coverRate = (cover.filter((c) => c > 0.5).length / cover.length) * 100;
+  const cwAvg = valid.reduce((a, f) => a + (f.caretR - f.caretX), 0) / valid.length; // 光标实际宽度（动态）
   console.log(`\n【${name}】有效帧 ${valid.length}`);
   console.log(`  前缘分离 caretX-maxX : 均值 ${f1(F.m)}px  P95 ${f1(F.p95)}px  最大 ${f1(F.mx)}px   （正=分离，负=覆盖光标 ${f1(-F.m)}px）`);
-  console.log(`  覆盖光标像素          : 均值 ${f1(C.m)}/8px   有重叠帧占比 ${coverRate.toFixed(0)}%`);
+  console.log(`  覆盖光标像素          : 均值 ${f1(C.m)}/${f1(cwAvg)}px   有重叠帧占比 ${coverRate.toFixed(0)}%`);
   console.log(`  后缘滞后 caretX-minX : 均值 ${f1(T.m)}px  （拖尾向后延伸长度）`);
   console.log(`  形状总宽度            : 均值 ${f1(W.m)}px`);
 }
@@ -93,6 +95,7 @@ function report(name, all) {
     { name: "按住键 repeat（33ms / 8px）", fn: () => window.__scene.keyRepeat({}), hold: 2600 },
     { name: "手动打字（160ms / 8px）", fn: () => window.__scene.typing({}), hold: 3000 },
     { name: "鼠标乱晃（16ms / ±20px 随机游走）", fn: () => window.__scene.swing({}), hold: 2100 },
+    { name: "持续快速移动（16ms / 40px 折返）", fn: () => window.__scene.fastDrag({}), hold: 1900 },
     { name: "单次大跳（+400px）", fn: () => window.__scene.jumpOnce(), hold: 1200 },
   ];
 

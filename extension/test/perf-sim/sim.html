@@ -8,7 +8,7 @@
   html, body { margin: 0; height: 100%; background: #1e1e1e; }
   .monaco-editor { position: relative; width: 900px; height: 400px; margin: 120px auto; background: #1e1e1e; }
   .cursors-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
-  .cursor { position: absolute; width: 8px; height: 18px; background: #d4d4d4; }
+  .cursor { position: absolute; width: 2px; height: 19px; background: #d4d4d4; } /* 与真实 VS Code 光标一致（约 2px 宽） */
 </style>
 </head>
 <body>
@@ -37,6 +37,10 @@
       while (now >= sim.nextAt) {
         if (sim.kind === "linear") {
           sim.x += sim.stepPx;
+        } else if (sim.kind === "bounce") { // 持续快速移动（到边界折返）
+          sim.x += sim.stepPx * sim.dir;
+          if (sim.x > 760) { sim.x = 760; sim.dir = -1; }
+          if (sim.x < 40) { sim.x = 40; sim.dir = 1; }
         } else { // 随机游走
           sim.x += (Math.random() * 2 - 1) * sim.stepPx;
           sim.y += (Math.random() * 2 - 1) * sim.stepPx;
@@ -132,6 +136,14 @@
       S.reset();
       moveTo(500, 120);
       fireEvents("x");
+    };
+
+    /* 场景 5：持续快速移动（每帧 +40px 折返，模拟快速拖动/甩动 — dist > 阈值，走远距离分支） */
+    S.fastDrag = (o) => {
+      const { intervalMs = 16, stepPx = 40, durationMs = 1200 } = o || {};
+      S.reset();
+      const t = performance.now();
+      sim = { kind: "bounce", intervalMs, stepPx, x: 60, y: 120, dir: 1, nextAt: t + intervalMs, endAt: t + durationMs };
     };
 
     window.__scene = S;
