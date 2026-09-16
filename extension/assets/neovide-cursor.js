@@ -23,10 +23,12 @@ const cursorConfig = {
   canvasFadeTransitionCss: "opacity 0.075s ease-out",
   nativeCursorDisappearTransitionCss: "opacity 0s ease-out",
   nativeCursorRevealTransitionCss: "opacity 0.075s ease-in",
-  // v1.2.1 新增：是否隐藏原生光标。
-  //   true（默认）= 完整 Neovide 效果：原生光标隐去，完全由 canvas 动画光标呈现
-  //   false        = 保留原生光标，canvas 仅叠加拖尾（早期的实际行为）
-  hideNativeCursor: true,
+  // 是否隐藏原生光标。
+  //   false（默认）= 保留原生光标负责精确跟随，canvas 仅叠加拖尾特效
+  //   true          = 原生光标隐去，跟随完全由物理引擎呈现（约 0.1s 滞后感）
+  // 说明：历史版本中因 target 字段缺失，"隐藏原生光标"逻辑从未生效，
+  // 因此"原生光标 + canvas 拖尾"才是本效果事实上被长期验证的观感（v1.2.3 改回默认）。
+  hideNativeCursor: false,
 };
 /* __AUTO_CONFIG_END__ */
 

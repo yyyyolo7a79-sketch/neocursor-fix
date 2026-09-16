@@ -110,6 +110,25 @@ A: Before uninstalling, restore `workbench.html` (remove the two injected lines 
 
 ## 📝 更新日志 / Changelog
 
+### v1.2.3
+- 🐛 修复快速移动/拖动时的"跟随延迟感"：v1.2.1 修复 `target` 字段后首次真正启用了
+  「隐藏原生光标」逻辑，使跟随完全依赖物理引擎（弹簧动画固有约 0.1s 滞后，实测快速
+  移动时光标头落后目标 74px）。现回退为默认**保留原生光标**（精确跟随）+ canvas 叠加
+  拖尾——这也是历史版本因该字段缺失而**事实上长期验证过**的观感。
+  需要"纯净 Neovide 模式"（原生光标隐去）可将 `hideNativeCursor` 手动设为 `true`。
+
+<details>
+<summary>v1.2.3 (English)</summary>
+
+- 🐛 Fixed the "following lag" during fast movement / dragging: v1.2.1's fix of the
+  `target` field enabled native-cursor hiding for the first time, leaving following
+  entirely to the physics engine (inherent ~0.1s spring lag; measured 74px behind the
+  target during fast movement). Now defaults back to **keeping the native cursor**
+  (precise following) + canvas trail overlay — the behavior that was in fact
+  experienced for a long time (the hiding logic never ran before due to that field).
+  For a "pure Neovide mode" set `hideNativeCursor: true` manually.
+</details>
+
 ### v1.2.2
 - 🐛 修复**拖动选择**（按住鼠标拖动）时跟随延迟高、拖尾消失、出现"两个光标"的问题：
   拖动时光标跟随鼠标移动但不触发键盘/选择事件，导致 v1.2.1 的事件脏标记缺位、动画停更。
