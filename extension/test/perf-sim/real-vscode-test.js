@@ -18,14 +18,46 @@ const { spawn, execSync } = require("child_process");
 const PW = process.env.PW_PATH || "C:/Users/PC/AppData/Roaming/npm/node_modules/playwright";
 const { chromium } = require(PW);
 
-const VSCODE_EXE = "D:/develop/Microsoft VS Code/Code.exe";
-const WB_DIR = "D:/develop/Microsoft VS Code/645f29cc31/resources/app/out/vs/code/electron-browser/workbench";
+// NC_EDITOR=cursor 时可对 Cursor 做同样的金标准测试（默认 VS Code）
+const EDITOR = process.env.NC_EDITOR === "cursor" ? "cursor" : "code";
+const EDITOR_EXE = EDITOR === "cursor"
+  ? "D:/develop/Cursor/cursor/Cursor.exe"
+  : "D:/develop/Microsoft VS Code/Code.exe";
+const INSTALL_ROOT = EDITOR === "cursor"
+  ? "D:/develop/Cursor/cursor"
+  : "D:/develop/Microsoft VS Code";
+
+/** 自动探测 workbench 目录（兼容两种结构：<install>/<hash>/resources/app/...（VS Code zip 版）
+ *  与 <install>/resources/app/...（Cursor 标准安装）；多命中时取最近修改的版本目录） */
+function probeWbDir(installRoot) {
+  const bases = [installRoot]; // Cursor：resources/app 直接在安装根下
+  try {
+    for (const e of fs.readdirSync(installRoot, { withFileTypes: true })) {
+      if (e.isDirectory()) bases.push(path.join(installRoot, e.name)); // VS Code：<hash>/
+    }
+  } catch (err) { /* ignore */ }
+  let best = null, bestMtime = 0;
+  for (const b of bases) {
+    for (const rel of ["out/vs/code/electron-sandbox/workbench", "out/vs/code/electron-browser/workbench"]) {
+      const p = path.join(b, "resources", "app", rel);
+      try {
+        if (fs.existsSync(p)) {
+          const mt = fs.statSync(p).mtimeMs;
+          if (!best || mt > bestMtime) { best = p; bestMtime = mt; }
+        }
+      } catch (err) { /* ignore */ }
+    }
+  }
+  return best;
+}
+const WB_DIR = probeWbDir(INSTALL_ROOT);
+if (!WB_DIR) throw new Error("未能探测到 workbench 目录: " + INSTALL_ROOT);
 // NC_SCRIPT：可指定任意脚本文件作为被测对象（用于与历史版本做基准对照）
 const SRC_SCRIPT = process.env.NC_SCRIPT || path.resolve(__dirname, "..", "..", "assets", "neovide-cursor.js");
 
-const PORT = 9333;
-const PROFILE = path.join(os.tmpdir(), "neovide-cdp-profile");
-const TESTFILE = path.join(os.tmpdir(), "neovide-cdp-test.js");
+const PORT = EDITOR === "cursor" ? 9444 : 9333;
+const PROFILE = path.join(os.tmpdir(), "neovide-cdp-profile-" + EDITOR);
+const TESTFILE = path.join(os.tmpdir(), "neovide-cdp-test" + (EDITOR === "cursor" ? "-cursor" : "") + ".js");
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -75,7 +107,7 @@ const f1 = (v) => (v == null ? "-" : v.toFixed(1));
   fs.writeFileSync(TESTFILE, "// neovide CDP 测试文件（用于输入 'a'）\n" + "// 填充行填充行填充行填充行\n".repeat(80));
 
   // 3. 启动 VS Code（独立 profile；不会附加到用户已开的实例）
-  const proc = spawn(VSCODE_EXE, [
+  const proc = spawn(EDITOR_EXE, [
     `--remote-debugging-port=${PORT}`,
     `--user-data-dir=${PROFILE}`,
     "--new-window",

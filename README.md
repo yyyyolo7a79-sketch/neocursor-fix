@@ -33,17 +33,17 @@ The original extension ([vscode-neovide-cursor](https://github.com/LengineerC/vs
 
 ## 🚀 快速开始 / Quick Start
 
-1. 从 [Releases](https://github.com/yyyyolo7a79-sketch/neocursor-fix/releases) 下载最新 `neovide-cursor-injector-1.2.6.vsix`
+1. 从 [Releases](https://github.com/yyyyolo7a79-sketch/neocursor-fix/releases) 下载最新 `neovide-cursor-injector-1.2.7.vsix`
 2. 安装扩展：
    - VS Code / Cursor：命令面板执行 `Extensions: Install from VSIX...` 选择该文件
-   - 或命令行：`cursor --install-extension neovide-cursor-injector-1.2.6.vsix`
+   - 或命令行：`cursor --install-extension neovide-cursor-injector-1.2.7.vsix`
 3. **完全重启编辑器**（不是 Reload Window）
 4. 完成！打字时即可看到弹性光标动画
 
-1. Download the latest `neovide-cursor-injector-1.2.6.vsix` from [Releases](https://github.com/yyyyolo7a79-sketch/neocursor-fix/releases).
+1. Download the latest `neovide-cursor-injector-1.2.7.vsix` from [Releases](https://github.com/yyyyolo7a79-sketch/neocursor-fix/releases).
 2. Install it:
    - VS Code / Cursor: run `Extensions: Install from VSIX...` and pick the file
-   - Or via CLI: `cursor --install-extension neovide-cursor-injector-1.2.6.vsix`
+   - Or via CLI: `cursor --install-extension neovide-cursor-injector-1.2.7.vsix`
 3. **Fully restart the editor** (not Reload Window).
 4. Done! You'll see the elastic cursor animation while typing.
 
@@ -109,6 +109,38 @@ A: Before uninstalling, restore `workbench.html` (remove the two injected lines 
 ---
 
 ## 📝 更新日志 / Changelog
+
+### v1.2.7
+- 🐛 **前缘瞬时贴合（不改动拖尾时长）**：修复快速连续输入（按住 `a`、方向键）时
+  "拖尾跟不上光标 / 两个光标"的观感——前角（移动方向上的角点）的吸附时长 0.02s
+  在每次光标跳变后留下约 5px 的持续滞后，而真实光标仅约 2px 宽，形状前缘因此
+  脱离光标本体。现在前角吸附时长 = 0（对任意帧率恒为瞬时贴合），**尾巴的长度与
+  弹性仍由其余角点的 0.05 / 0.1 时长决定，完全不受影响**。
+  实测（sim 固定场景，2px 光标）：前缘分离 P95 各场景全部归零（keyRepeat/乱晃/
+  快速移动从 0 / 1.1 / 6.0px → -1.0 / -0.4 / -1.0px）；快速移动拖尾宽度
+  98.6px → **103.2px**（略增，因为前角不再"占用"形状前半）。真实 Cursor 环境
+  验证：快速输入下前缘分离恒定 -1.0px、100% 帧覆盖光标本体。
+- 与 v1.2.5 的区别：那次置 0 时该参数还兼任"快速移动收缩"公式的下限（该公式已在
+  v1.2.6 整体移除），导致整条拖尾消失；现在它是纯粹的前角吸附时长，无第二重身份。
+
+<details>
+<summary>v1.2.7 (English)</summary>
+
+- 🐛 **Instant leading-edge snap (without touching trail durations)**: fixed the
+  "trail can't keep up / two cursors" look during fast repeated typing (holding `a`
+  or arrow keys). The leading corners' 0.02s snap left a persistent ~5px lag after
+  each caret jump, and real carets are only ~2px wide, so the shape's leading edge
+  detached from the caret body. The leading snap duration is now 0 (instant snap at
+  any frame rate) while **the tail's length and elasticity still come entirely from
+  the other corners' 0.05 / 0.1 durations — unaffected**.
+  Measured (fixed sim scene, 2px caret): leading-edge separation P95 dropped to
+  -1.0 / -0.4 / -1.0px across scenes (from 0 / 1.1 / 6.0px); fast-move trail width
+  98.6px → **103.2px** (slightly longer). Verified on real Cursor: leading-edge
+  separation constant -1.0px with 100% caret coverage during fast typing.
+- Difference from v1.2.5: back then the 0 also zeroed the floor of the
+  "fast-move shrink" formula (removed entirely in v1.2.6), killing the whole
+  trail; the parameter is now purely the leading snap duration.
+</details>
 
 ### v1.2.6
 - ⏪ **回退 v1.2.4 / v1.2.5 的动画时长改动，恢复 v1.2.0 的时长体系**（拖尾速度以 v1.2.0 为准）：

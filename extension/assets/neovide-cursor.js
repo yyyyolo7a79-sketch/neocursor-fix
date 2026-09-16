@@ -20,10 +20,15 @@ const cursorConfig = {
   animationResetThreshold: 0.09,
   maxTrailDistanceFactor: 60,
   // 吸附角（移动方向上的角点）的动画时长。
-  // v1.2.6：恢复为 v1.2.0 的 0.02。v1.2.5 曾改为 0（前缘瞬时贴合），但该值
-  // 同时是「快速移动收缩」公式的下限，置 0 会让快速移动时拖尾瞬间消失
-  // （用户实测：「拖尾怎么这么快，还没看到就消失了」）。
-  snapAnimationLength: 0.02,
+  // v1.2.7：0.02 → 0（瞬时贴合）。弹簧更新里有 "animationLength <= dt → 直接
+  // 归位" 的短路：0 对任意帧率恒成立，前角每次移动后立即贴住光标。canvas 叠在
+  // 光标上层，形状前缘始终包住光标本体 —— 消除快速连续输入（按住 a / 方向键）
+  // 时前缘约 5px 滞后造成的"两个光标"观感。
+  // 注意：本参数只用于前角吸附。v1.2.4 的"快速移动收缩"已在 v1.2.6 整体移除，
+  // 该参数不再有第二重身份（这正是 v1.2.5 那次改动失败的教训——当时置 0 同时
+  // 废掉了收缩下限，导致快速移动时整条拖尾消失）。
+  // 尾巴的长度与弹性由其余角点的时长（短 0.05 / 远 0.1）决定，不受此项影响。
+  snapAnimationLength: 0,
   canvasFadeTransitionCss: "opacity 0.075s ease-out",
   nativeCursorDisappearTransitionCss: "opacity 0s ease-out",
   nativeCursorRevealTransitionCss: "opacity 0.075s ease-in",
