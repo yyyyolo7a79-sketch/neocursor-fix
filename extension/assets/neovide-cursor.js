@@ -419,6 +419,7 @@ class GlobalCursorManager {
     for (const evt of [
       "keydown",
       "keyup",
+      "mousemove", // v1.2.2：拖动选择时光标跟随鼠标移动，必须置脏（帧内消费，成本极低）
       "mousedown",
       "mouseup",
       "focusin",

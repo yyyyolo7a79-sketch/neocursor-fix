@@ -110,6 +110,20 @@ A: Before uninstalling, restore `workbench.html` (remove the two injected lines 
 
 ## 📝 更新日志 / Changelog
 
+### v1.2.2
+- 🐛 修复**拖动选择**（按住鼠标拖动）时跟随延迟高、拖尾消失、出现"两个光标"的问题：
+  拖动时光标跟随鼠标移动但不触发键盘/选择事件，导致 v1.2.1 的事件脏标记缺位、动画停更。
+  现将 `mousemove` 纳入脏标记事件源（置位为 O(1) 成本，DOM 读取仍在帧内消费、每帧至多一次）。
+
+<details>
+<summary>v1.2.2 (English)</summary>
+
+- 🐛 Fixed high latency, lost trails, and "two cursors" when drag-selecting with the
+  mouse held down: the caret follows the mouse without emitting key/selection events,
+  so the v1.2.1 dirty flag was never set. `mousemove` is now a dirty-flag source
+  (O(1) cost; actual DOM reads still happen at most once per frame).
+</details>
+
 ### v1.2.1
 - 🐛 **修复渲染进程崩溃问题**：重构动画脚本的 DOM 监听与渲染循环 —— 旧版用
   MutationObserver 全量监听 + 渲染循环内每帧强制布局读取，在宿主高负载场景
