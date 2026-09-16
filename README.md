@@ -33,17 +33,17 @@ The original extension ([vscode-neovide-cursor](https://github.com/LengineerC/vs
 
 ## 🚀 快速开始 / Quick Start
 
-1. 从 [Releases](https://github.com/yyyyolo7a79-sketch/neocursor-fix/releases) 下载最新 `neovide-cursor-injector-1.2.7.vsix`
+1. 从 [Releases](https://github.com/yyyyolo7a79-sketch/neocursor-fix/releases) 下载最新 `neovide-cursor-injector-1.2.8.vsix`
 2. 安装扩展：
    - VS Code / Cursor：命令面板执行 `Extensions: Install from VSIX...` 选择该文件
-   - 或命令行：`cursor --install-extension neovide-cursor-injector-1.2.7.vsix`
+   - 或命令行：`cursor --install-extension neovide-cursor-injector-1.2.8.vsix`
 3. **完全重启编辑器**（不是 Reload Window）
 4. 完成！打字时即可看到弹性光标动画
 
-1. Download the latest `neovide-cursor-injector-1.2.7.vsix` from [Releases](https://github.com/yyyyolo7a79-sketch/neocursor-fix/releases).
+1. Download the latest `neovide-cursor-injector-1.2.8.vsix` from [Releases](https://github.com/yyyyolo7a79-sketch/neocursor-fix/releases).
 2. Install it:
    - VS Code / Cursor: run `Extensions: Install from VSIX...` and pick the file
-   - Or via CLI: `cursor --install-extension neovide-cursor-injector-1.2.7.vsix`
+   - Or via CLI: `cursor --install-extension neovide-cursor-injector-1.2.8.vsix`
 3. **Fully restart the editor** (not Reload Window).
 4. Done! You'll see the elastic cursor animation while typing.
 
@@ -109,6 +109,33 @@ A: Before uninstalling, restore `workbench.html` (remove the two injected lines 
 ---
 
 ## 📝 更新日志 / Changelog
+
+### v1.2.8
+- 🐛 修复**按住方向键（←/→/↑/↓）快速移动时形状被拉成"大团"、跟不上光标**的问题：
+  按住方向键会不断**跨行**（光标位置瞬间大跳数百像素，实测 664px/33ms），固定时长
+  下形状被拉伸成横跨的"大团"（实测形状宽度 15px）。新增**瞬移判定**——「行跳」
+  （y 位移达到一行高：跨行 / 上下键 / 换行）或「超大幅单帧位移」（≥300px）时全部
+  角点立即贴合，形状保持紧凑（实测 15px → 7px）。打字与拖动的长拖尾不受影响
+  （四场景回归：快速移动拖尾 95px 保持、打字 1.7px、乱晃 5.5px）。
+- 🔧 判定采用「单帧位移」而非「速度」：速度对 rAF 帧间隔抖动敏感，偶发短间隔
+  会把普通快速拖动误判为高速（实测拖尾会被从 103px 压缩到 39px，故弃用）。
+
+<details>
+<summary>v1.2.8 (English)</summary>
+
+- 🐛 Fixed the shape being stretched into a "blob" that can't keep up while holding
+  arrow keys. Holding an arrow key repeatedly **wraps lines** (the caret position
+  jumps hundreds of pixels at once — measured 664px/33ms), and with a fixed duration
+  the shape gets stretched across lines (measured width 15px). Added a **teleport
+  rule**: on a "line jump" (vertical move of a full line height: line wrap / up-down
+  keys / newline) or an oversized single-frame move (≥300px), all corners snap
+  instantly — the shape stays compact (measured 15px → 7px). Typing and dragging
+  trails are unaffected (regression: fast-move trail 95px kept, typing 1.7px,
+  swing 5.5px).
+- 🔧 The rule uses **single-frame displacement**, not speed: speed is sensitive to
+  rAF interval jitter, which misjudged ordinary fast dragging as high speed
+  (compressed the trail from 103px to 39px in tests).
+</details>
 
 ### v1.2.7
 - 🐛 **前缘瞬时贴合（不改动拖尾时长）**：修复快速连续输入（按住 `a`、方向键）时

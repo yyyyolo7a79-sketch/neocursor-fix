@@ -104,7 +104,8 @@ const f1 = (v) => (v == null ? "-" : v.toFixed(1));
     "telemetry.telemetryLevel": "off",
     "update.mode": "none",
   }, null, 2));
-  fs.writeFileSync(TESTFILE, "// neovide CDP 测试文件（用于输入 'a'）\n" + "// 填充行填充行填充行填充行\n".repeat(80));
+  // 使用长行（约 660px/行）以贴近真实代码文件——跨行时的位移量与真实场景一致
+  fs.writeFileSync(TESTFILE, "// neovide CDP 测试文件（用于输入 'a'）\n" + ("// " + "填充内容".repeat(20) + "\n").repeat(80));
 
   // 3. 启动 VS Code（独立 profile；不会附加到用户已开的实例）
   const proc = spawn(EDITOR_EXE, [
@@ -215,6 +216,17 @@ const f1 = (v) => (v == null ? "-" : v.toFixed(1));
       if (el && canvas && canvas.width > 0) {
         const cs = getComputedStyle(el);
         const r = el.getBoundingClientRect();
+        // 目标值（style.left，脚本定位所用）换算到视口坐标，与"实际渲染位置"对比：
+        // 两者不等 ⇒ 光标存在插值/平滑动画（形状按目标值跟随会超前于可见光标）
+        let styleX = null;
+        try {
+          const sl = parseFloat(el.style.left);
+          const anchor = el.offsetParent;
+          if (!isNaN(sl) && anchor) {
+            const ar = anchor.getBoundingClientRect();
+            styleX = ar.left + anchor.clientLeft + sl;
+          }
+        } catch (e2) { /* ignore */ }
         const vis = cs.display !== "none" && cs.visibility !== "hidden" && r.width > 0;
         if (vis) {
           const ctx = canvas.getContext("2d");
@@ -258,7 +270,7 @@ const f1 = (v) => (v == null ? "-" : v.toFixed(1));
             }
             window.__real.push({
               t: performance.now(),
-              caretX: r.left, caretR: r.right,
+              caretX: r.left, caretR: r.right, styleX,
               minX: n ? minX + x0 : null, maxX: n ? maxX + x0 : null, n,
               op: parseFloat(canvas.style.opacity || "0"),
               dbg,
@@ -312,6 +324,13 @@ const f1 = (v) => (v == null ? "-" : v.toFixed(1));
     for (let i = 1; i < valid.length; i++) dts.push(valid[i].t - valid[i - 1].t);
     const DT = st(dts);
     if (DT) console.log(`  探针帧间隔            : 均值 ${f1(DT.m)}ms（约 ${(1000 / Math.max(DT.m, 1)).toFixed(0)}fps）`);
+    // 目标值（style.left）vs 实际渲染位置（rect.left）：检测光标插值/平滑动画
+    const withStyle = valid.filter((f) => f.styleX != null);
+    if (withStyle.length) {
+      const diffs = withStyle.map((f) => f.caretX - f.styleX); // 实际 − 目标
+      const D = st(diffs);
+      console.log(`  光标 实际−目标(style)  : 均值 ${f1(D.m)}px  P95 ${f1(D.p95)}px  最大 ${f1(D.mx)}px（≠0 ⇒ 存在插值动画）`);
+    }
     // 停止后拖尾收敛：形状宽度回到 ≤2px 所需时间 —— 直接量化"拖尾消失快慢"
     const stopAt = await page.evaluate(() => window.__stoppedAt || 0);
     if (stopAt) {
@@ -326,6 +345,23 @@ const f1 = (v) => (v == null ? "-" : v.toFixed(1));
   }
 
   await sampleStats("键盘快速输入（33ms/字符）");
+
+  // 11b. 场景：按住方向键 →（真实 key repeat：CDP autoRepeat，无 keyup；先到行尾以触发跨行移动）
+  console.log("\n⌨️  按住方向键 →（真实 autoRepeat，含跨行移动）…");
+  await page.keyboard.press("End"); // 先到行尾
+  await sleep(150);
+  await page.evaluate(() => { window.__real.length = 0; });
+  const cdp = await page.context().newCDPSession(page);
+  const key = { windowsVirtualKeyCode: 39, nativeVirtualKeyCode: 39, code: "ArrowRight", key: "ArrowRight" };
+  await cdp.send("Input.dispatchKeyEvent", { type: "rawKeyDown", ...key, autoRepeat: false });
+  for (let i = 0; i < 40; i++) {
+    await cdp.send("Input.dispatchKeyEvent", { type: "rawKeyDown", ...key, autoRepeat: true });
+    await sleep(33);
+  }
+  await cdp.send("Input.dispatchKeyEvent", { type: "keyUp", ...key });
+  await page.evaluate(() => { window.__stoppedAt = performance.now(); });
+  await sleep(400);
+  await sampleStats("按住方向键 →（autoRepeat 含跨行）");
 
   // 12. 场景 2：按住左键乱晃（拖动选择）
   console.log("\n🖱️  按住左键乱晃 ~1.5s…");
