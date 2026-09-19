@@ -13,6 +13,11 @@
 > Neovide 風格的游標彈性動畫（社群修復版），支援 **VS Code 與 Cursor**。無需 Custom CSS Loader，安裝 VSIX 即可使用，編輯器更新後自動重新注入。
 
 [![License: GPL-3.0](https://img.shields.io/badge/License-GPL--3.0-blue.svg)](../../LICENSE)
+![VS Code](https://img.shields.io/badge/VS%20Code-1.80%2B-007ACC?logo=visualstudiocode&logoColor=white)
+![Cursor](https://img.shields.io/badge/Cursor-supported-000000?logo=cursor&logoColor=white)
+![JavaScript](https://img.shields.io/badge/JavaScript-ES2020-F7DF1E?logo=javascript&logoColor=black)
+[![Stars](https://img.shields.io/github/stars/yyyyolo7a79-sketch/neocursor-fix?style=flat)](https://github.com/yyyyolo7a79-sketch/neocursor-fix/stargazers)
+[![Downloads](https://img.shields.io/github/downloads/yyyyolo7a79-sketch/neocursor-fix/total?style=flat)](https://github.com/yyyyolo7a79-sketch/neocursor-fix/releases)
 [![Latest release](https://img.shields.io/github/v/release/yyyyolo7a79-sketch/neocursor-fix)](https://github.com/yyyyolo7a79-sketch/neocursor-fix/releases)
 
 > 📄 此檔案為精簡翻譯版；完整更新日誌與最新內容以 [English README](../../README.md) 為準。

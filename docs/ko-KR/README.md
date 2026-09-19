@@ -13,6 +13,11 @@
 > Neovide 스타일의 탄성 커서 애니메이션(커뮤니티 수정판). **VS Code와 Cursor**를 지원합니다. Custom CSS Loader가 필요 없습니다 — VSIX를 설치하면 바로 사용할 수 있습니다. 에디터 업데이트 후에도 자동으로 다시 주입됩니다.
 
 [![License: GPL-3.0](https://img.shields.io/badge/License-GPL--3.0-blue.svg)](../../LICENSE)
+![VS Code](https://img.shields.io/badge/VS%20Code-1.80%2B-007ACC?logo=visualstudiocode&logoColor=white)
+![Cursor](https://img.shields.io/badge/Cursor-supported-000000?logo=cursor&logoColor=white)
+![JavaScript](https://img.shields.io/badge/JavaScript-ES2020-F7DF1E?logo=javascript&logoColor=black)
+[![Stars](https://img.shields.io/github/stars/yyyyolo7a79-sketch/neocursor-fix?style=flat)](https://github.com/yyyyolo7a79-sketch/neocursor-fix/stargazers)
+[![Downloads](https://img.shields.io/github/downloads/yyyyolo7a79-sketch/neocursor-fix/total?style=flat)](https://github.com/yyyyolo7a79-sketch/neocursor-fix/releases)
 [![Latest release](https://img.shields.io/github/v/release/yyyyolo7a79-sketch/neocursor-fix)](https://github.com/yyyyolo7a79-sketch/neocursor-fix/releases)
 
 > 📄 이 문서는 간략 번역본입니다. 전체 변경 기록과 최신 내용은 [English README](../../README.md)를 참고하세요.

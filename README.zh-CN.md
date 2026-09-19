@@ -13,6 +13,11 @@
 > Neovide 风格的光标弹性动画（社区修复版），支持 **VS Code 与 Cursor**。无需 Custom CSS Loader，安装 VSIX 即用，编辑器更新后自动重新注入。
 
 [![License: GPL-3.0](https://img.shields.io/badge/License-GPL--3.0-blue.svg)](LICENSE)
+![VS Code](https://img.shields.io/badge/VS%20Code-1.80%2B-007ACC?logo=visualstudiocode&logoColor=white)
+![Cursor](https://img.shields.io/badge/Cursor-supported-000000?logo=cursor&logoColor=white)
+![JavaScript](https://img.shields.io/badge/JavaScript-ES2020-F7DF1E?logo=javascript&logoColor=black)
+[![Stars](https://img.shields.io/github/stars/yyyyolo7a79-sketch/neocursor-fix?style=flat)](https://github.com/yyyyolo7a79-sketch/neocursor-fix/stargazers)
+[![Downloads](https://img.shields.io/github/downloads/yyyyolo7a79-sketch/neocursor-fix/total?style=flat)](https://github.com/yyyyolo7a79-sketch/neocursor-fix/releases)
 [![Latest release](https://img.shields.io/github/v/release/yyyyolo7a79-sketch/neocursor-fix)](https://github.com/yyyyolo7a79-sketch/neocursor-fix/releases)
 
 > 📄 此文件为精简翻译版；完整更新日志与最新内容以 [English README](README.md) 为准。
